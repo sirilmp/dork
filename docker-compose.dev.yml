@@ -1,0 +1,25 @@
+# Optional dev override: only runs postgres in Docker, so you can run the
+# server and client locally with `npm run dev` for fast iteration/HMR.
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jira_clone}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jira_clone}
+      POSTGRES_DB: ${POSTGRES_DB:-jira_clone}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-jira_clone}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_dev_data:

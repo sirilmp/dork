@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SystemRole {
+  ADMIN
+  MEMBER
+}
+
+enum ProjectRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum IssueType {
+  EPIC
+  STORY
+  TASK
+  BUG
+  SUBTASK
+}
+
+enum IssueStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum IssuePriority {
+  LOWEST
+  LOW
+  MEDIUM
+  HIGH
+  HIGHEST
+}
+
+enum IssueLinkType {
+  BLOCKS
+  RELATES_TO
+  DUPLICATES
+}
+
+enum NotificationType {
+  ISSUE_ASSIGNED
+  COMMENT_MENTION
+  COMMENT_ADDED
+  ISSUE_STATUS_CHANGED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  role         SystemRole @default(MEMBER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  leadingProjects   Project[]       @relation("ProjectLead")
+  memberships       ProjectMember[]
+  reportedIssues    Issue[]         @relation("ReportedIssues")
+  assignedIssues    Issue[]         @relation("AssignedIssues")
+  comments          Comment[]
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+
+  @@index([email])
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  leadId      String?
+  lead        User?    @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Next sequential issue number to assign within this project (PROJ-1, PROJ-2, ...).
+  issueCounter Int @default(0)
+
+  members ProjectMember[]
+  issues  Issue[]
+  labels  Label[]
+
+  @@index([leadId])
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  role      ProjectRole @default(MEMBER)
+  createdAt DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model Issue {
+  id          String        @id @default(uuid())
+  projectId   String
+  number      Int
+  type        IssueType     @default(TASK)
+  title       String
+  description String?
+  status      IssueStatus   @default(TODO)
+  priority    IssuePriority @default(MEDIUM)
+
+  assigneeId String?
+  reporterId String
+  parentId   String?
+
+  storyPoints Int?
+  dueDate     DateTime?
+
+  // Position within its status column on the kanban board (lower = earlier).
+  // Not part of the original spec's field list but needed to support
+  // within-column drag-and-drop reordering; defaults to insertion order.
+  order Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("AssignedIssues", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporter User    @relation("ReportedIssues", fields: [reporterId], references: [id], onDelete: Restrict)
+  parent   Issue?  @relation("IssueChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children Issue[] @relation("IssueChildren")
+
+  labels        IssueLabel[]
+  comments      Comment[]
+  activityLogs  ActivityLog[]
+  linksFrom     IssueLink[]   @relation("LinksFrom")
+  linksTo       IssueLink[]   @relation("LinksTo")
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@index([assigneeId])
+  @@index([reporterId])
+  @@index([parentId])
+}
+
+model Label {
+  id        String  @id @default(uuid())
+  projectId String
+  name      String
+  color     String  @default("#6366f1")
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues  IssueLabel[]
+
+  @@unique([projectId, name])
+}
+
+model IssueLabel {
+  issueId String
+  labelId String
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([issueId, labelId])
+}
+
+model IssueLink {
+  id            String        @id @default(uuid())
+  issueId       String
+  linkedIssueId String
+  type          IssueLinkType
+
+  issue       Issue @relation("LinksFrom", fields: [issueId], references: [id], onDelete: Cascade)
+  linkedIssue Issue @relation("LinksTo", fields: [linkedIssueId], references: [id], onDelete: Cascade)
+
+  @@unique([issueId, linkedIssueId, type])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  issueId   String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+}
+
+// Auto-recorded on field changes such as status/assignee transitions.
+model ActivityLog {
+  id        String   @id @default(uuid())
+  issueId   String
+  actorId   String
+  field     String
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  actor User  @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  payload   Json
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+// Singleton row (id = "singleton") holding server-admin-configured branding.
+model BrandingSettings {
+  id           String   @id @default("singleton")
+  productName  String   @default("Open Issue Tracker")
+  logoUrl      String?
+  faviconUrl   String?
+  primaryColor String   @default("#2563eb")
+  accentColor  String   @default("#7c3aed")
+  updatedAt    DateTime @updatedAt
+}
+
+// Singleton row (id = "singleton") holding server-admin-configured SMTP settings.
+// NOTE: `password` is stored in plaintext for this MVP. In a real deployment this
+// column should be encrypted at rest (e.g. via application-level envelope
+// encryption or a secrets manager) — isolate access behind the admin-only API
+// and treat this as a TODO before handling real credentials.
+model SmtpSettings {
+  id          String   @id @default("singleton")
+  host        String?
+  port        Int      @default(587)
+  username    String?
+  password    String?
+  fromAddress String?
+  secure      Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+}

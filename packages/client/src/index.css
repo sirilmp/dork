@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Defaults; overridden at runtime by ThemeProvider from /api/branding. */
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #7c3aed;
+  --color-accent-foreground: #ffffff;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900;
+}

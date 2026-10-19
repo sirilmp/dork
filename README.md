@@ -21,8 +21,22 @@ configurable branding and SMTP, without touching code.
 - **Kanban board**: per-project board whose columns come from that project's
   own configurable workflow (see below), drag-and-drop (via `@dnd-kit`) to
   reorder within a column or move between columns (optimistic UI + API call,
-  with rollback and a toast explaining why on failure), and a filter bar
-  (assignee, label, type, free-text search).
+  with rollback and a toast explaining why on failure), a filter bar
+  (assignee, label, type, free-text search behind a compact "Filter" popover),
+  and an overlapping avatar-stack quick filter (click an avatar to toggle it
+  into a multi-select OR filter; composes with the detailed filters via AND).
+  Each column shows a "+" to create an issue directly into that status, and a
+  collapse toggle that shrinks it to a thin labeled strip.
+- **WIP limits**: an optional per-status limit (project Settings → Workflow),
+  shown on the board as a "count/limit" badge that turns red when exceeded.
+  Purely advisory — like Jira, exceeding it never blocks a drag-and-drop move,
+  it's just an unmistakable visual nudge.
+- **Swimlanes (group-by)**: group the board by Assignee or Epic into
+  collapsible swimlane rows, each showing the same status columns filtered to
+  that lane. An issue belongs to an epic's lane only when its direct parent is
+  itself type EPIC (anything else — no parent, or a non-epic parent — falls
+  into "No epic"); dragging a card into a different lane also reassigns that
+  grouping field (assignee or parent epic), on top of any status change.
 - **Customizable workflows**: each project defines its own ordered list of
   statuses (name, color, and a `category` of `TODO` / `IN_PROGRESS` / `DONE`)
   instead of a fixed enum — add, rename, recolor, reorder, and set the
@@ -70,6 +84,17 @@ configurable branding and SMTP, without touching code.
   Simplified by design: only one ACTIVE sprint per project (enforced at the
   application level, not the schema), and there's no custom sprint-internal
   issue ordering (that field is reserved for the kanban board).
+- **List & Calendar views**: `/projects/:id/list` is a sortable table (key,
+  type, title, status, assignee, priority, labels, due date, points) of every
+  issue in the project; `/projects/:id/calendar` is a month grid (built on
+  `date-fns`, no extra calendar library) showing issues on their due date,
+  with a "No due date" side panel for the rest. Both reuse the same
+  `IssueDetailModal` as the board/backlog for clicking into an issue. A tab
+  bar (Board / Backlog / List / Calendar) sits above all four views.
+  Board group-by, and both board/swimlane collapsed-state, are **per-browser**
+  (`localStorage`), not account state — same reasoning as "Recent" below:
+  nobody needs their board layout to follow them to another device, so it's
+  a client-only convenience rather than a schema/endpoint.
 - **Burndown chart**: `GET /api/sprints/:id/burndown` and an inline hand-rolled
   SVG chart (no charting library) on the active sprint's backlog section.
   Computed on demand from existing data (`Issue.storyPoints`, `createdAt`, and

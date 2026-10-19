@@ -101,6 +101,25 @@ async function loadIssueOr404(issueId: string) {
 export const issuesRouter = Router();
 issuesRouter.use(requireAuth);
 
+// "For you" home page: issues assigned to the caller across every project
+// they belong to (or, for system ADMINs, across all projects). Must be
+// registered before /:issueId so "mine" isn't swallowed as an issue id.
+issuesRouter.get(
+  '/mine',
+  asyncHandler(async (req, res) => {
+    const isAdmin = req.user!.role === 'ADMIN';
+    const issues = await prisma.issue.findMany({
+      where: {
+        assigneeId: req.user!.sub,
+        project: isAdmin ? undefined : { members: { some: { userId: req.user!.sub } } },
+      },
+      include: issueInclude,
+      orderBy: { updatedAt: 'desc' },
+    });
+    res.json(issues.map(serializeIssue));
+  })
+);
+
 issuesRouter.get(
   '/:issueId',
   asyncHandler(async (req, res) => {

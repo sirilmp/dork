@@ -14,6 +14,8 @@ import { notificationsRouter } from './modules/notifications/notifications.route
 import { adminRouter } from './modules/admin/admin.routes';
 import { publicBrandingRouter } from './modules/admin/branding.public.routes';
 import { adminUsersModuleRouter, publicInvitesRouter } from './modules/admin-users/admin-users.routes';
+import { meRouter } from './modules/me/me.routes';
+import { teamsReadRouter } from './modules/teams/teams.routes';
 
 const app = express();
 
@@ -38,6 +40,8 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/admin', adminUsersModuleRouter);
 app.use('/api/invites', publicInvitesRouter);
+app.use('/api/me', meRouter);
+app.use('/api/teams', teamsReadRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

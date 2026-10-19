@@ -91,6 +91,7 @@ model User {
   notifications     Notification[]
   teamMemberships   TeamMember[]
   sentInvites       Invite[]        @relation("InvitedBy")
+  starredProjects   StarredProject[]
 
   @@index([email])
 }
@@ -156,6 +157,7 @@ model Project {
   issues  Issue[]
   labels  Label[]
   sprints Sprint[]
+  starredBy StarredProject[]
 
   @@index([leadId])
 }
@@ -176,6 +178,21 @@ model Sprint {
   issues  Issue[]
 
   @@index([projectId, status])
+}
+
+// Backend-persisted starring (follows the account across devices, unlike the
+// client's localStorage-only "Recent" list — see sidebar notes).
+model StarredProject {
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@unique([userId, projectId])
+  @@index([projectId])
 }
 
 model ProjectMember {

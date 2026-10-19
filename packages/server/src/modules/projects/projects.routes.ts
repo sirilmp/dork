@@ -124,6 +124,35 @@ projectsRouter.delete(
   })
 );
 
+// --- Starring ----------------------------------------------------------
+// Backend-persisted (unlike the sidebar's "Recent" list, which is
+// localStorage-only) so a starred project follows the account across
+// devices, matching Jira's own Starred behavior.
+
+projectsRouter.post(
+  '/:projectId/star',
+  requireProjectRole(ProjectRole.VIEWER),
+  asyncHandler(async (req, res) => {
+    await prisma.starredProject.upsert({
+      where: { userId_projectId: { userId: req.user!.sub, projectId: req.params.projectId } },
+      create: { userId: req.user!.sub, projectId: req.params.projectId },
+      update: {},
+    });
+    res.status(201).json({ starred: true });
+  })
+);
+
+projectsRouter.delete(
+  '/:projectId/star',
+  requireProjectRole(ProjectRole.VIEWER),
+  asyncHandler(async (req, res) => {
+    await prisma.starredProject
+      .delete({ where: { userId_projectId: { userId: req.user!.sub, projectId: req.params.projectId } } })
+      .catch(() => undefined);
+    res.status(204).send();
+  })
+);
+
 // --- Membership ------------------------------------------------------------
 
 const addMemberSchema = z.object({

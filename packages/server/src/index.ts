@@ -23,6 +23,11 @@ import { crossProjectQueryRouter, filtersRouter, projectQueryRouter } from './mo
 import { workloadRouter } from './modules/workload/workload.routes';
 import { activityRouter } from './modules/activity/activity.routes';
 import { reportsRouter } from './modules/reports/reports.routes';
+import { webhooksRouter } from './modules/webhooks/webhooks.routes';
+import swaggerUi from 'swagger-ui-express';
+import yaml from 'js-yaml';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 
@@ -59,6 +64,16 @@ app.use('/api/me', meRouter);
 app.use('/api/teams', teamsReadRouter);
 app.use('/api/workload', workloadRouter);
 app.use('/api/activity', activityRouter);
+app.use('/api/projects/:projectId/webhooks', webhooksRouter);
+
+// Interactive API reference, served from the committed OpenAPI spec so
+// self-hosters get discoverable docs without needing to find openapi.yaml
+// themselves. See openapi.yaml and README.md ("REST API") for details.
+const openapiPath = path.join(__dirname, '..', 'openapi.yaml');
+if (fs.existsSync(openapiPath)) {
+  const openapiDocument = yaml.load(fs.readFileSync(openapiPath, 'utf8')) as Record<string, unknown>;
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapiDocument));
+}
 
 app.use(notFoundHandler);
 app.use(errorHandler);

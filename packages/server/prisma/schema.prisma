@@ -176,8 +176,54 @@ model Project {
   workflowTransitions WorkflowTransition[]
   customFieldDefinitions CustomFieldDefinition[]
   savedFilters        SavedFilter[]
+  webhooks            Webhook[]
 
   @@index([leadId])
+}
+
+// Project-admin-configured outbound webhook — see modules/webhooks/dispatch.ts
+// for where these fire from. `secret` is the raw HMAC-SHA256 signing key,
+// stored in plaintext (same tradeoff as SmtpSettings.password: the server
+// needs the live value to sign every delivery, so hashing it like a password
+// isn't an option) but never serialized back out by any route except the one
+// POST that creates it — see webhooks.routes.ts's `serializeWebhook`.
+model Webhook {
+  id               String    @id @default(uuid())
+  projectId        String
+  url              String
+  secret           String
+  // Array of subscribed event-type strings, e.g. ["issue.created", "sprint.started"].
+  // See modules/webhooks/events.ts for the fixed set this app can actually emit.
+  events           Json
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastTriggeredAt  DateTime?
+  lastResponseStatus Int?
+
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([projectId])
+}
+
+// Delivery log for a Webhook, capped to the dispatcher's one-retry-on-failure
+// behavior (one WebhookDelivery row per attempt). Retention isn't pruned in
+// this pass — a known limitation; a long-lived self-host should add periodic
+// cleanup of old rows before this table grows unbounded.
+model WebhookDelivery {
+  id             String   @id @default(uuid())
+  webhookId      String
+  event          String
+  payload        Json
+  responseStatus Int?
+  succeeded      Boolean
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
 }
 
 // Project-admin-defined custom field on this project's issues. `options` is

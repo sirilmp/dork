@@ -16,6 +16,7 @@ import {
 } from './issues.service';
 import { notifyUser } from '../notifications/notifications.service';
 import { assertStatusInProject, assertTransitionAllowed, getDefaultStatus } from '../workflow/workflow.service';
+import { dispatchWebhookEvent } from '../webhooks/dispatch';
 
 // Accepts either a plain "YYYY-MM-DD" date (what the client's DatePicker
 // sends, per its own doc comment) or a full ISO datetime, so the two never
@@ -130,6 +131,11 @@ projectIssuesRouter.post(
         },
       });
     }
+
+    // Fire-and-forget: never awaited, so a slow/unreachable webhook endpoint
+    // cannot add latency to (or fail) this request. dispatchWebhookEvent
+    // swallows its own errors, so this can never become an unhandled rejection.
+    void dispatchWebhookEvent(projectId, 'issue.created', serializeIssue(issue));
 
     res.status(201).json(serializeIssue(issue));
   })
@@ -293,11 +299,22 @@ issuesRouter.patch(
         });
       }
 
-      if (input.statusId && input.statusId !== existing.statusId && updated.assigneeId) {
+      const statusChanged = Boolean(input.statusId && input.statusId !== existing.statusId);
+      if (statusChanged && updated.assigneeId) {
         await notifyUser({
           userId: updated.assigneeId,
           type: NotificationType.ISSUE_STATUS_CHANGED,
           payload: { issueId: updated.id, title: updated.title, status: updated.status.name },
+        });
+      }
+
+      // Fire-and-forget (see the create route's comment above for why this is
+      // never awaited): the triggering PATCH must not wait on external HTTP calls.
+      void dispatchWebhookEvent(existing.projectId, 'issue.updated', serializeIssue(updated));
+      if (statusChanged) {
+        void dispatchWebhookEvent(existing.projectId, 'issue.statusChanged', {
+          ...serializeIssue(updated),
+          previousStatus: existing.status.name,
         });
       }
 

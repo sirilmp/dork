@@ -7,6 +7,7 @@ import { requireProjectRole } from '../../middleware/projectAccess';
 import { asyncHandler, HttpError } from '../../middleware/errorHandler';
 import { issueInclude, logActivity, serializeIssue } from '../issues/issues.service';
 import { assertNoActiveSprint, computeBurndown, loadSprintOr404 } from './sprints.service';
+import { dispatchWebhookEvent } from '../webhooks/dispatch';
 
 // Mounted at /api/projects/:projectId/sprints
 export const projectSprintsRouter = Router({ mergeParams: true });
@@ -145,6 +146,7 @@ sprintsRouter.post(
         where: { id: sprint.id },
         data: { status: SprintStatus.ACTIVE, startDate, endDate },
       });
+      void dispatchWebhookEvent(sprint.projectId, 'sprint.started', updated);
       res.json(updated);
     });
   })
@@ -194,6 +196,7 @@ sprintsRouter.post(
       });
 
       const updated = await prisma.sprint.findUnique({ where: { id: sprint.id } });
+      void dispatchWebhookEvent(sprint.projectId, 'sprint.completed', updated);
       res.json(updated);
     });
   })

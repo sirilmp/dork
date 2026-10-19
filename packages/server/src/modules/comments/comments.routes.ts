@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth';
 import { requireProjectRole } from '../../middleware/projectAccess';
 import { asyncHandler, HttpError } from '../../middleware/errorHandler';
 import { notifyUser, resolveMentions } from '../notifications/notifications.service';
+import { dispatchWebhookEvent } from '../webhooks/dispatch';
 
 // Mounted at /api/issues/:issueId/comments
 export const commentsRouter = Router({ mergeParams: true });
@@ -60,6 +61,12 @@ commentsRouter.post(
           },
         });
       }
+
+      // Fire-and-forget: this request must not wait on an external HTTP call.
+      void dispatchWebhookEvent(issue.projectId, 'comment.created', {
+        comment,
+        issue: { id: issue.id, title: issue.title },
+      });
 
       res.status(201).json(comment);
     });

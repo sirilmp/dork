@@ -66,24 +66,53 @@ export interface IssueSprintState {
  * logged status name was later renamed on the project will fall back to
  * being treated as not-done for that historical entry, an accepted
  * limitation of not storing a point-in-time category snapshot per log entry.
+ *
+ * The pre-first-log fallback deliberately uses the *earliest known* category
+ * (the oldValue of the issue's first-ever "status" log, if it has one)
+ * rather than its current status, and that lookup always scans the *full*
+ * `activity` passed in regardless of `asOf` below — only the replay loop
+ * respects the cutoff. Baselining off "current" would be wrong for velocity,
+ * which asks "was this issue done as of a past sprint's completedAt": an
+ * issue whose one and only status log fires *after* that cutoff (e.g. it was
+ * finished well after its sprint closed) must still baseline as "not done"
+ * at the cutoff, even though its current status is DONE.
+ *
+ * `asOf`, when given, caps which logs the replay loop applies (logs after it
+ * are ignored), so the returned state reflects that past instant rather than
+ * "now" — used by velocity. Burndown omits it: it always wants the fully
+ * up-to-date state (the per-day loop in computeBurndown instead walks day by
+ * day against that one final reconstruction).
  */
 export function reconstructIssueSprintTimelines(
   sprint: Pick<Sprint, 'id' | 'startDate'>,
   issues: Array<{ id: string; createdAt: Date; status: { category: StatusCategory } }>,
-  activity: Array<Pick<ActivityLog, 'issueId' | 'field' | 'newValue' | 'createdAt'>>,
-  categoryByName: Map<string, StatusCategory>
+  activity: Array<Pick<ActivityLog, 'issueId' | 'field' | 'oldValue' | 'newValue' | 'createdAt'>>,
+  categoryByName: Map<string, StatusCategory>,
+  asOf?: Date
 ): Map<string, IssueSprintState> {
   const sprintStart = sprint.startDate ?? new Date(0);
   const states = new Map<string, IssueSprintState>();
 
+  const firstStatusLogByIssue = new Map<string, (typeof activity)[number]>();
+  for (const log of activity) {
+    if (log.field === 'status' && !firstStatusLogByIssue.has(log.issueId)) {
+      firstStatusLogByIssue.set(log.issueId, log);
+    }
+  }
+
   for (const issue of issues) {
     const fallback = issue.createdAt < sprintStart ? sprintStart : issue.createdAt;
+    const firstLog = firstStatusLogByIssue.get(issue.id);
+    const earliestKnownCategory = firstLog?.oldValue
+      ? categoryByName.get(firstLog.oldValue) ?? issue.status.category
+      : issue.status.category;
     const state: IssueSprintState = { addedAt: fallback };
-    if (issue.status.category === 'DONE') state.doneAt = issue.createdAt;
+    if (earliestKnownCategory === 'DONE') state.doneAt = issue.createdAt;
     states.set(issue.id, state);
   }
 
   for (const log of activity) {
+    if (asOf && log.createdAt > asOf) continue;
     const state = states.get(log.issueId);
     if (!state) continue;
     if (log.field === 'sprint' && log.newValue === sprint.id) {
@@ -231,12 +260,15 @@ export async function computeVelocity(projectId: string): Promise<VelocityPoint[
     : [];
 
   return sprints.map((sprint) => {
-    const memberIds = [...(everAssigned.get(sprint.id) ?? [])];
-    const members = memberIds.map((id) => issueById.get(id)).filter((i): i is NonNullable<typeof i> => !!i);
+    const memberIds = new Set(everAssigned.get(sprint.id) ?? []);
+    const members = [...memberIds].map((id) => issueById.get(id)).filter((i): i is NonNullable<typeof i> => !!i);
     const completedAt = sprint.completedAt ?? new Date();
-    const memberActivity = allActivity.filter((log) => memberIds.includes(log.issueId) && log.createdAt <= completedAt);
+    // The full (not completedAt-truncated) activity for these issues is passed in, with
+    // `asOf: completedAt` instead — reconstructIssueSprintTimelines needs the full history
+    // to correctly baseline an issue whose only status log fires after the cutoff.
+    const memberActivity = allActivity.filter((log) => memberIds.has(log.issueId));
 
-    const timelines = reconstructIssueSprintTimelines(sprint, members, memberActivity, categoryByName);
+    const timelines = reconstructIssueSprintTimelines(sprint, members, memberActivity, categoryByName, completedAt);
 
     let committedPoints = 0;
     let completedPoints = 0;

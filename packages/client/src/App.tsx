@@ -17,6 +17,7 @@ import { ProjectSettingsPage } from './pages/ProjectSettingsPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { FiltersPage } from './pages/FiltersPage';
 import { WorkloadPage } from './pages/WorkloadPage';
+import { ActivityPage } from './pages/ActivityPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 
 export default function App() {
@@ -144,6 +145,16 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <WorkloadPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activity"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ActivityPage />
             </Layout>
           </ProtectedRoute>
         }

@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Activity,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -355,6 +356,7 @@ export function Sidebar({
         <div className="my-2 border-t border-border" />
 
         <NavRow to="/filters" icon={<ListFilter />} label="Filters" collapsed={collapsed} />
+        <NavRow to="/activity" icon={<Activity />} label="Activity" collapsed={collapsed} />
         <NavRow to="/workload" icon={<Gauge />} label="Workload" collapsed={collapsed} />
         {reportsHref && <NavRow to={reportsHref} icon={<LineChart />} label="Reports" collapsed={collapsed} />}
         <NavRow to="/teams" icon={<Users />} label="Teams" collapsed={collapsed} />

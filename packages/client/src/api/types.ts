@@ -263,6 +263,23 @@ export interface IssueLink {
   type: 'BLOCKS' | 'RELATES_TO' | 'DUPLICATES';
 }
 
+/** A single global-feed entry: an ActivityLogEntry with the issue/project it
+ * belongs to joined in, so the feed renders a full sentence with no further
+ * round-trips (see GET /api/activity). */
+export interface GlobalActivityEntry extends ActivityLogEntry {
+  issue: {
+    id: string;
+    key: string;
+    title: string;
+    project: { id: string; key: string; name: string };
+  };
+}
+
+export interface ActivityFeedPage {
+  entries: GlobalActivityEntry[];
+  nextCursor: string | null;
+}
+
 export interface IssueDetail extends Issue {
   comments: Comment[];
   activity: ActivityLogEntry[];

@@ -111,7 +111,8 @@ configurable branding and SMTP, without touching code.
   (backend-persisted `StarredProject` model + `/api/me/starred` and
   `/api/projects/:id/star`, so — unlike Recent — it follows your account
   across devices), **Projects** (mirrors Jira's "Spaces": a Recent sub-list
-  plus an expandable "More projects"), **Teams**, and **Admin Settings**
+  plus an expandable "More projects"), **Filters**, **Workload**, **Teams**,
+  and **Admin Settings**
   (admins only). Collapses to an icon-only rail (state persisted in
   `localStorage`) and falls back to a hamburger-triggered overlay on narrow
   viewports.
@@ -168,6 +169,16 @@ configurable branding and SMTP, without touching code.
   supported syntax. Like every other filter in this app, the compiler goes
   through Prisma's typed query builder exclusively — no user input is ever
   concatenated into a SQL string.
+- **Workload view** (`/workload`, `GET /api/workload` + `/api/workload/me`):
+  open (not-done) issue load per assignee, across projects or narrowed to one
+  project/team, sorted by whoever has the most. Issue count is the primary
+  bar metric (story points shown as secondary text) since most issues in
+  practice have no story points set, making a points-only bar mostly empty.
+  Access-scoped: the cross-user comparison is visible to a system ADMIN
+  always, and to anyone else only for the projects where they hold the
+  project-ADMIN role; everyone else still sees their own breakdown via the
+  self-service `/me` endpoint, with a note that the fuller view needs
+  project-admin access somewhere.
 
 ## Query language reference
 

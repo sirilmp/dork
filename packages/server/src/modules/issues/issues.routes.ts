@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth';
 import { requireProjectRole } from '../../middleware/projectAccess';
 import { asyncHandler, HttpError } from '../../middleware/errorHandler';
 import {
+  activityActorSelect,
   applyCustomFieldValues,
   extractPlainText,
   issueInclude,
@@ -177,7 +178,7 @@ issuesRouter.get(
         }),
         prisma.activityLog.findMany({
           where: { issueId: issue.id },
-          include: { actor: { select: { id: true, name: true, avatarUrl: true } } },
+          include: { actor: { select: activityActorSelect } },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.issueLink.findMany({

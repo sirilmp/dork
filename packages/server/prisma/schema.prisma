@@ -464,6 +464,10 @@ model ActivityLog {
   actor User  @relation(fields: [actorId], references: [id], onDelete: Cascade)
 
   @@index([issueId])
+  // Supports the global activity feed's newest-first ordering/pagination
+  // and its actor filter, across the whole table rather than one issue.
+  @@index([createdAt])
+  @@index([actorId])
 }
 
 model Notification {

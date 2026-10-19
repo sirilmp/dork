@@ -55,6 +55,10 @@ export function validateCustomFieldValue(
   }
 }
 
+/** Shared actor projection for ActivityLog reads — the per-issue activity
+ * panel and the cross-project /api/activity feed both join the same fields. */
+export const activityActorSelect = { id: true, name: true, avatarUrl: true } as const;
+
 /** Records a diff entry in the issue's activity log. No-op if values are equal. */
 export async function logActivity(
   issueId: string,

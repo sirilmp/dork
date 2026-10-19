@@ -21,6 +21,7 @@ import { customFieldsRouter } from './modules/custom-fields/custom-fields.routes
 import { attachmentsRouter, issueAttachmentsRouter } from './modules/attachments/attachments.routes';
 import { crossProjectQueryRouter, filtersRouter, projectQueryRouter } from './modules/filters/filters.routes';
 import { workloadRouter } from './modules/workload/workload.routes';
+import { activityRouter } from './modules/activity/activity.routes';
 import { reportsRouter } from './modules/reports/reports.routes';
 
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/invites', publicInvitesRouter);
 app.use('/api/me', meRouter);
 app.use('/api/teams', teamsReadRouter);
 app.use('/api/workload', workloadRouter);
+app.use('/api/activity', activityRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -419,7 +419,11 @@ export function IssueDetailModal({
 
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-semibold uppercase text-muted-foreground">Due date</Label>
-                  <DatePicker value={issue.dueDate} onChange={(v) => updateField({ dueDate: v })} />
+                  {/* issue.dueDate is a full ISO datetime from the API (Prisma's
+                      DateTime serialization); DatePicker takes a plain
+                      "YYYY-MM-DD", so slice off the time part before handing
+                      it over. */}
+                  <DatePicker value={issue.dueDate?.slice(0, 10) ?? null} onChange={(v) => updateField({ dueDate: v })} />
                 </div>
 
                 <div className="flex flex-col gap-1.5">

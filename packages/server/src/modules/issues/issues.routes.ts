@@ -16,6 +16,15 @@ import {
 import { notifyUser } from '../notifications/notifications.service';
 import { assertStatusInProject, assertTransitionAllowed, getDefaultStatus } from '../workflow/workflow.service';
 
+// Accepts either a plain "YYYY-MM-DD" date (what the client's DatePicker
+// sends, per its own doc comment) or a full ISO datetime, so the two never
+// drift out of sync again — `new Date(...)` below parses either form fine.
+const dueDateSchema = z
+  .string()
+  .refine((v) => !Number.isNaN(Date.parse(v)), { message: 'Invalid date' })
+  .nullable()
+  .optional();
+
 // Mounted at /api/projects/:projectId/issues
 export const projectIssuesRouter = Router({ mergeParams: true });
 
@@ -62,7 +71,7 @@ const createIssueSchema = z.object({
   assigneeId: z.string().uuid().nullable().optional(),
   parentId: z.string().uuid().nullable().optional(),
   storyPoints: z.number().int().min(0).max(100).nullable().optional(),
-  dueDate: z.string().datetime().nullable().optional(),
+  dueDate: dueDateSchema,
   labelIds: z.array(z.string().uuid()).optional(),
   customFieldValues: z.array(customFieldValueEntrySchema).optional(),
 });
@@ -194,7 +203,7 @@ const updateIssueSchema = z.object({
   assigneeId: z.string().uuid().nullable().optional(),
   parentId: z.string().uuid().nullable().optional(),
   storyPoints: z.number().int().min(0).max(100).nullable().optional(),
-  dueDate: z.string().datetime().nullable().optional(),
+  dueDate: dueDateSchema,
   labelIds: z.array(z.string().uuid()).optional(),
   customFieldValues: z.array(customFieldValueEntrySchema).optional(),
 });

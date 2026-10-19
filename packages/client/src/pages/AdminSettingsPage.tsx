@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { brandingApi, smtpApi } from '../api/admin';
 import { Branding, SmtpSettings } from '../api/types';
 import { useTheme } from '../theme/ThemeProvider';
@@ -6,6 +7,12 @@ import { ApiError } from '../api/client';
 import { UsersTab } from './admin/UsersTab';
 import { InvitesTab } from './admin/InvitesTab';
 import { TeamsTab } from './admin/TeamsTab';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Button } from '../components/ui/button';
+import { Switch } from '../components/ui/switch';
 
 type AdminTab = 'general' | 'users' | 'invites' | 'teams';
 
@@ -22,9 +29,6 @@ export function AdminSettingsPage() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [smtp, setSmtp] = useState<SmtpSettings | null>(null);
   const [smtpPassword, setSmtpPassword] = useState('');
-  const [brandingStatus, setBrandingStatus] = useState<string | null>(null);
-  const [smtpStatus, setSmtpStatus] = useState<string | null>(null);
-  const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
 
   useEffect(() => {
@@ -35,21 +39,19 @@ export function AdminSettingsPage() {
   async function handleSaveBranding(e: FormEvent) {
     e.preventDefault();
     if (!branding) return;
-    setBrandingStatus(null);
     try {
       const updated = await brandingApi.update(branding);
       setBranding(updated);
       await refresh();
-      setBrandingStatus('Branding saved.');
+      toast.success('Branding saved.');
     } catch (err) {
-      setBrandingStatus(err instanceof ApiError ? err.message : 'Failed to save branding');
+      toast.error(err instanceof ApiError ? err.message : 'Failed to save branding');
     }
   }
 
   async function handleSaveSmtp(e: FormEvent) {
     e.preventDefault();
     if (!smtp) return;
-    setSmtpStatus(null);
     try {
       const updated = await smtpApi.update({
         host: smtp.host,
@@ -61,20 +63,20 @@ export function AdminSettingsPage() {
       });
       setSmtp(updated);
       setSmtpPassword('');
-      setSmtpStatus('SMTP settings saved.');
+      toast.success('SMTP settings saved.');
     } catch (err) {
-      setSmtpStatus(err instanceof ApiError ? err.message : 'Failed to save SMTP settings');
+      toast.error(err instanceof ApiError ? err.message : 'Failed to save SMTP settings');
     }
   }
 
   async function handleTestEmail() {
     setTesting(true);
-    setTestStatus(null);
     try {
       const result = await smtpApi.sendTest();
-      setTestStatus({ ok: result.ok, message: result.message ?? result.error ?? 'Unknown result' });
+      if (result.ok) toast.success(result.message ?? 'Test email sent.');
+      else toast.error(result.error ?? 'Failed to send test email');
     } catch (err) {
-      setTestStatus({ ok: false, message: err instanceof ApiError ? err.message : 'Failed to send test email' });
+      toast.error(err instanceof ApiError ? err.message : 'Failed to send test email');
     } finally {
       setTesting(false);
     }
@@ -82,186 +84,191 @@ export function AdminSettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-semibold text-slate-800">Admin Settings</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-foreground">Admin Settings</h1>
 
-      <div className="mb-6 flex gap-1 border-b border-slate-200">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-              tab === t.id ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as AdminTab)}>
+        <TabsList className="mb-6">
+          {TABS.map((t) => (
+            <TabsTrigger key={t.id} value={t.id}>
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {tab === 'users' && <UsersTab />}
-      {tab === 'invites' && <InvitesTab />}
-      {tab === 'teams' && <TeamsTab />}
+        <TabsContent value="users">
+          <UsersTab />
+        </TabsContent>
+        <TabsContent value="invites">
+          <InvitesTab />
+        </TabsContent>
+        <TabsContent value="teams">
+          <TeamsTab />
+        </TabsContent>
 
-      {tab === 'general' &&
-        (!branding || !smtp ? (
-          <div className="py-8 text-slate-500">Loading settings...</div>
-        ) : (
-          <>
-      <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-800">Branding</h2>
-        <form onSubmit={handleSaveBranding} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Product name
-            <input
-              value={branding.productName}
-              onChange={(e) => setBranding({ ...branding, productName: e.target.value })}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Logo URL
-            <input
-              value={branding.logoUrl ?? ''}
-              onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value || null })}
-              placeholder="https://example.com/logo.svg"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Favicon URL
-            <input
-              value={branding.faviconUrl ?? ''}
-              onChange={(e) => setBranding({ ...branding, faviconUrl: e.target.value || null })}
-              placeholder="https://example.com/favicon.ico"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Primary color
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={branding.primaryColor}
-                  onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                  className="h-9 w-12 rounded border border-slate-300"
-                />
-                <input
-                  value={branding.primaryColor}
-                  onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-                />
-              </div>
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Accent color
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={branding.accentColor}
-                  onChange={(e) => setBranding({ ...branding, accentColor: e.target.value })}
-                  className="h-9 w-12 rounded border border-slate-300"
-                />
-                <input
-                  value={branding.accentColor}
-                  onChange={(e) => setBranding({ ...branding, accentColor: e.target.value })}
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-                />
-              </div>
-            </label>
-          </div>
+        <TabsContent value="general">
+          {!branding || !smtp ? (
+            <div className="py-8 text-muted-foreground">Loading settings...</div>
+          ) : (
+            <div className="flex flex-col gap-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Branding</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSaveBranding} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="product-name">Product name</Label>
+                      <Input
+                        id="product-name"
+                        value={branding.productName}
+                        onChange={(e) => setBranding({ ...branding, productName: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="logo-url">Logo URL</Label>
+                      <Input
+                        id="logo-url"
+                        value={branding.logoUrl ?? ''}
+                        onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value || null })}
+                        placeholder="https://example.com/logo.svg"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="favicon-url">Favicon URL</Label>
+                      <Input
+                        id="favicon-url"
+                        value={branding.faviconUrl ?? ''}
+                        onChange={(e) => setBranding({ ...branding, faviconUrl: e.target.value || null })}
+                        placeholder="https://example.com/favicon.ico"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="primary-color">Primary color</Label>
+                        <div className="flex items-center gap-2">
+                          {/* A native color input is the simplest reliable swatch picker here — a
+                              shadcn Popover+canvas picker would be more "custom" but adds real
+                              complexity for no behavior this app needs yet. */}
+                          <input
+                            id="primary-color"
+                            type="color"
+                            value={branding.primaryColor}
+                            onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
+                            className="h-10 w-12 cursor-pointer rounded-md border border-input bg-background"
+                          />
+                          <Input
+                            value={branding.primaryColor}
+                            onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="accent-color">Accent color</Label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            id="accent-color"
+                            type="color"
+                            value={branding.accentColor}
+                            onChange={(e) => setBranding({ ...branding, accentColor: e.target.value })}
+                            className="h-10 w-12 cursor-pointer rounded-md border border-input bg-background"
+                          />
+                          <Input
+                            value={branding.accentColor}
+                            onChange={(e) => setBranding({ ...branding, accentColor: e.target.value })}
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-          {brandingStatus && <p className="text-sm text-slate-600">{brandingStatus}</p>}
+                    <Button type="submit" className="self-start">
+                      Save branding
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
 
-          <button type="submit" className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-            Save branding
-          </button>
-        </form>
-      </section>
+              <Card>
+                <CardHeader>
+                  <CardTitle>SMTP (email notifications)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSaveSmtp} className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="smtp-host">Host</Label>
+                        <Input
+                          id="smtp-host"
+                          value={smtp.host}
+                          onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
+                          placeholder="smtp.example.com"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="smtp-port">Port</Label>
+                        <Input
+                          id="smtp-port"
+                          type="number"
+                          value={smtp.port}
+                          onChange={(e) => setSmtp({ ...smtp, port: Number(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="smtp-secure"
+                        checked={smtp.secure}
+                        onCheckedChange={(checked) => setSmtp({ ...smtp, secure: checked })}
+                      />
+                      <Label htmlFor="smtp-secure">Use TLS (secure connection)</Label>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="smtp-username">Username</Label>
+                      <Input
+                        id="smtp-username"
+                        value={smtp.username}
+                        onChange={(e) => setSmtp({ ...smtp, username: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="smtp-password">
+                        Password{' '}
+                        {smtp.passwordSet && (
+                          <span className="text-xs font-normal text-muted-foreground">(currently set — leave blank to keep)</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="smtp-password"
+                        type="password"
+                        value={smtpPassword}
+                        onChange={(e) => setSmtpPassword(e.target.value)}
+                        placeholder={smtp.passwordSet ? '••••••••' : ''}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="smtp-from">From address</Label>
+                      <Input
+                        id="smtp-from"
+                        value={smtp.fromAddress}
+                        onChange={(e) => setSmtp({ ...smtp, fromAddress: e.target.value })}
+                        placeholder='"Open Issue Tracker" <no-reply@example.com>'
+                      />
+                    </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-800">SMTP (email notifications)</h2>
-        <form onSubmit={handleSaveSmtp} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Host
-              <input
-                value={smtp.host}
-                onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
-                placeholder="smtp.example.com"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Port
-              <input
-                type="number"
-                value={smtp.port}
-                onChange={(e) => setSmtp({ ...smtp, port: Number(e.target.value) })}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-              />
-            </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input
-              type="checkbox"
-              checked={smtp.secure}
-              onChange={(e) => setSmtp({ ...smtp, secure: e.target.checked })}
-            />
-            Use TLS (secure connection)
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Username
-            <input
-              value={smtp.username}
-              onChange={(e) => setSmtp({ ...smtp, username: e.target.value })}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Password {smtp.passwordSet && <span className="text-xs font-normal text-slate-400">(currently set — leave blank to keep)</span>}
-            <input
-              type="password"
-              value={smtpPassword}
-              onChange={(e) => setSmtpPassword(e.target.value)}
-              placeholder={smtp.passwordSet ? '••••••••' : ''}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            From address
-            <input
-              value={smtp.fromAddress}
-              onChange={(e) => setSmtp({ ...smtp, fromAddress: e.target.value })}
-              placeholder='"Open Issue Tracker" <no-reply@example.com>'
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-
-          {smtpStatus && <p className="text-sm text-slate-600">{smtpStatus}</p>}
-
-          <div className="flex items-center gap-3">
-            <button type="submit" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-              Save SMTP settings
-            </button>
-            <button
-              type="button"
-              onClick={handleTestEmail}
-              disabled={testing}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
-            >
-              {testing ? 'Sending...' : 'Send test email'}
-            </button>
-          </div>
-
-          {testStatus && (
-            <p className={`text-sm ${testStatus.ok ? 'text-emerald-600' : 'text-red-600'}`}>{testStatus.message}</p>
+                    <div className="flex items-center gap-3">
+                      <Button type="submit">Save SMTP settings</Button>
+                      <Button type="button" variant="outline" onClick={handleTestEmail} disabled={testing}>
+                        {testing ? 'Sending...' : 'Send test email'}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
           )}
-        </form>
-      </section>
-          </>
-        ))}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

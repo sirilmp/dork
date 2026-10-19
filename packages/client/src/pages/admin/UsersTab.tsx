@@ -1,21 +1,35 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { MoreHorizontal } from 'lucide-react';
 import { adminUsersApi } from '../../api/admin';
 import { AdminUser, SystemRole } from '../../api/types';
 import { ApiError } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../../components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 
 export function UsersTab() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [search, setSearch] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
 
   async function load(query?: string) {
     try {
       setUsers(await adminUsersApi.list(query));
-      setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load users');
+      toast.error(err instanceof ApiError ? err.message : 'Failed to load users');
     }
   }
 
@@ -29,106 +43,132 @@ export function UsersTab() {
     await load(search || undefined);
   }
 
-  async function act(fn: () => Promise<unknown>) {
-    setError(null);
+  async function act(fn: () => Promise<unknown>, successMessage?: string) {
     try {
       await fn();
       await load(search || undefined);
+      if (successMessage) toast.success(successMessage);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Action failed');
+      toast.error(err instanceof ApiError ? err.message : 'Action failed');
     }
   }
 
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    await act(() => adminUsersApi.remove(target.id), `${target.email} deleted.`);
+  }
+
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-6">
-      <h2 className="mb-4 text-lg font-semibold text-slate-800">Users</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>Users</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or email"
+            className="max-w-xs"
+          />
+          <Button type="submit" variant="outline">
+            Search
+          </Button>
+        </form>
 
-      <form onSubmit={handleSearch} className="mb-4 flex gap-2">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or email"
-          className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm"
-        />
-        <button type="submit" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">
-          Search
-        </button>
-      </form>
-
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 text-slate-500">
-              <th className="py-2 pr-4 font-medium">Name</th>
-              <th className="py-2 pr-4 font-medium">Email</th>
-              <th className="py-2 pr-4 font-medium">Role</th>
-              <th className="py-2 pr-4 font-medium">Status</th>
-              <th className="py-2 pr-4 font-medium">Joined</th>
-              <th className="py-2 pr-4 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Joined</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {users?.map((u) => (
-              <tr key={u.id} className="border-b border-slate-100">
-                <td className="py-2 pr-4">{u.name}</td>
-                <td className="py-2 pr-4">{u.email}</td>
-                <td className="py-2 pr-4">
-                  <select
+              <TableRow key={u.id}>
+                <TableCell>{u.name}</TableCell>
+                <TableCell>{u.email}</TableCell>
+                <TableCell>
+                  <Select
                     value={u.role}
-                    onChange={(e) => act(() => adminUsersApi.updateRole(u.id, e.target.value as SystemRole))}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                    onValueChange={(v) => act(() => adminUsersApi.updateRole(u.id, v as SystemRole), `${u.name} is now ${v}.`)}
                   >
-                    <option value="MEMBER">MEMBER</option>
-                    <option value="ADMIN">ADMIN</option>
-                  </select>
-                </td>
-                <td className="py-2 pr-4">
+                    <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MEMBER">MEMBER</SelectItem>
+                      <SelectItem value="ADMIN">ADMIN</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell>
                   {u.deactivatedAt ? (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">Deactivated</span>
+                    <Badge variant="secondary">Deactivated</Badge>
                   ) : (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">Active</span>
+                    <Badge className="border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Active</Badge>
                   )}
-                </td>
-                <td className="py-2 pr-4 text-slate-500">{new Date(u.createdAt).toLocaleDateString()}</td>
-                <td className="py-2 pr-4">
-                  <div className="flex flex-wrap gap-2">
-                    {u.deactivatedAt ? (
-                      <button
-                        onClick={() => act(() => adminUsersApi.reactivate(u.id))}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
-                      >
-                        Reactivate
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => act(() => adminUsersApi.deactivate(u.id))}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {u.deactivatedAt ? (
+                        <DropdownMenuItem
+                          onClick={() => act(() => adminUsersApi.reactivate(u.id), `${u.name} reactivated.`)}
+                        >
+                          Reactivate
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          disabled={u.id === me?.id}
+                          onClick={() => act(() => adminUsersApi.deactivate(u.id), `${u.name} deactivated.`)}
+                        >
+                          Deactivate
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
                         disabled={u.id === me?.id}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 disabled:opacity-50"
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setDeleteTarget(u)}
                       >
-                        Deactivate
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Permanently delete ${u.email}? This cannot be undone.`)) {
-                          act(() => adminUsersApi.remove(u.id));
-                        }
-                      }}
-                      disabled={u.id === me?.id}
-                      className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-        {users && users.length === 0 && <p className="py-4 text-sm text-slate-500">No users found.</p>}
-      </div>
-    </section>
+          </TableBody>
+        </Table>
+        {users && users.length === 0 && <p className="py-4 text-sm text-muted-foreground">No users found.</p>}
+      </CardContent>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {deleteTarget?.email}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">This permanently deletes the user. This cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

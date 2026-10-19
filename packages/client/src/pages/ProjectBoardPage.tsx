@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { issuesApi } from '../api/issues';
@@ -136,6 +136,12 @@ export function ProjectBoardPage() {
           <h1 className="text-xl font-semibold text-slate-800">
             {project.name} <span className="text-slate-400">({project.key})</span>
           </h1>
+          <div className="mt-1 flex gap-3 text-sm">
+            <span className="font-medium text-primary">Board</span>
+            <Link to={`/projects/${project.id}/backlog`} className="text-slate-500 hover:text-primary">
+              Backlog
+            </Link>
+          </div>
         </div>
         <button
           onClick={() => setShowCreate(true)}

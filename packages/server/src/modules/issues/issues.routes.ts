@@ -253,6 +253,43 @@ issuesRouter.post(
   })
 );
 
+// --- Sprint assignment --------------------------------------------------
+
+const moveToSprintSchema = z.object({
+  sprintId: z.string().uuid().nullable(),
+});
+
+issuesRouter.patch(
+  '/:issueId/sprint',
+  asyncHandler(async (req, res) => {
+    const existing = await loadIssueOr404(req.params.issueId);
+    req.params.projectId = existing.projectId;
+    await requireProjectRole(ProjectRole.MEMBER)(req, res, async () => {
+      const input = moveToSprintSchema.parse(req.body);
+
+      if (input.sprintId) {
+        const sprint = await prisma.sprint.findUnique({ where: { id: input.sprintId } });
+        if (!sprint || sprint.projectId !== existing.projectId) {
+          throw new HttpError(400, 'sprintId must reference a sprint in the same project');
+        }
+        if (sprint.status === 'COMPLETED') {
+          throw new HttpError(400, 'Cannot move an issue into a completed sprint');
+        }
+      }
+
+      const updated = await prisma.issue.update({
+        where: { id: existing.id },
+        data: { sprintId: input.sprintId },
+        include: issueInclude,
+      });
+
+      await logActivity(existing.id, req.user!.sub, 'sprint', existing.sprintId, input.sprintId);
+
+      res.json(serializeIssue(updated));
+    });
+  })
+);
+
 issuesRouter.delete(
   '/:issueId/links/:linkId',
   asyncHandler(async (req, res) => {

@@ -37,14 +37,27 @@ configurable branding and SMTP, without touching code.
   Includes a "Send test email" button.
 - **Seed script**: creates an admin user, a sample project with issues across
   every status, default branding, and an empty SMTP settings row.
+- **Backlog & sprints**: a `/projects/:id/backlog` view, separate from the
+  always-on kanban board, with drag-and-drop (via `@dnd-kit`) to move issues
+  between sprints and the backlog and to reorder the backlog. Sprints move
+  PLANNED → ACTIVE → COMPLETED; starting one sets a planned end date from a
+  chosen duration (default 14 days), and completing one moves any
+  not-Done issues to the backlog or another planned sprint, your choice.
+  Simplified by design: only one ACTIVE sprint per project (enforced at the
+  application level, not the schema), and there's no custom sprint-internal
+  issue ordering (that field is reserved for the kanban board).
+- **Burndown chart**: `GET /api/sprints/:id/burndown` and an inline hand-rolled
+  SVG chart (no charting library) on the active sprint's backlog section.
+  Computed on demand from existing data (`Issue.storyPoints`, `createdAt`, and
+  `ActivityLog` entries) rather than a pre-aggregated snapshot table — simpler
+  at the cost of recomputing the series per request, which is cheap at this
+  scale. Issues with no story points count as 0 toward the total.
 
 ## Not yet implemented / Roadmap
 
 These are explicitly out of scope for this pass, to keep it a genuinely
 working foundation rather than a sprawling half-built app. Clear next steps:
 
-- Sprints & backlog (separate from the single always-on board)
-- Burndown / velocity charts and other agile reporting
 - Custom workflow editor (configurable statuses/transitions per project)
 - JQL-like advanced search / saved filters
 - Public REST API documentation and webhooks for third-party integrations

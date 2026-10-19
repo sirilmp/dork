@@ -37,6 +37,42 @@ export interface Label {
   color: string;
 }
 
+export type SprintStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED';
+
+export interface Sprint {
+  id: string;
+  projectId: string;
+  name: string;
+  goal: string | null;
+  status: SprintStatus;
+  startDate: string | null;
+  endDate: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SprintWithIssues extends Sprint {
+  issues: Issue[];
+}
+
+export interface BacklogResponse {
+  sprints: SprintWithIssues[];
+  backlog: Issue[];
+}
+
+export interface BurndownPoint {
+  date: string;
+  totalPoints: number;
+  remainingPoints: number;
+}
+
+export interface BurndownResponse {
+  sprintId: string;
+  totalPoints: number;
+  points: BurndownPoint[];
+}
+
 export interface Issue {
   id: string;
   key: string;
@@ -53,6 +89,8 @@ export interface Issue {
   storyPoints: number | null;
   dueDate: string | null;
   order: number;
+  sprintId: string | null;
+  backlogOrder: number;
   createdAt: string;
   updatedAt: string;
   assignee: UserSummary | null;

@@ -47,6 +47,12 @@ enum IssueLinkType {
   DUPLICATES
 }
 
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
 enum NotificationType {
   ISSUE_ASSIGNED
   COMMENT_MENTION
@@ -91,8 +97,27 @@ model Project {
   members ProjectMember[]
   issues  Issue[]
   labels  Label[]
+  sprints Sprint[]
 
   @@index([leadId])
+}
+
+model Sprint {
+  id          String       @id @default(uuid())
+  projectId   String
+  name        String
+  goal        String?
+  status      SprintStatus @default(PLANNED)
+  startDate   DateTime?
+  endDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues  Issue[]
+
+  @@index([projectId, status])
 }
 
 model ProjectMember {
@@ -131,6 +156,12 @@ model Issue {
   // within-column drag-and-drop reordering; defaults to insertion order.
   order Int @default(0)
 
+  // Sprint the issue is planned into; null means it sits in the Backlog.
+  sprintId String?
+  // Position within the backlog list (separate from `order`, which is only
+  // used for kanban-column position on the board).
+  backlogOrder Int @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -139,6 +170,7 @@ model Issue {
   reporter User    @relation("ReportedIssues", fields: [reporterId], references: [id], onDelete: Restrict)
   parent   Issue?  @relation("IssueChildren", fields: [parentId], references: [id], onDelete: SetNull)
   children Issue[] @relation("IssueChildren")
+  sprint   Sprint? @relation(fields: [sprintId], references: [id], onDelete: SetNull)
 
   labels        IssueLabel[]
   comments      Comment[]
@@ -151,6 +183,7 @@ model Issue {
   @@index([assigneeId])
   @@index([reporterId])
   @@index([parentId])
+  @@index([sprintId])
 }
 
 model Label {

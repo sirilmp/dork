@@ -7,6 +7,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { useAuth } from './auth/AuthContext';
 import { ProjectsListPage } from './pages/ProjectsListPage';
 import { ProjectBoardPage } from './pages/ProjectBoardPage';
+import { BacklogPage } from './pages/BacklogPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 
 function AppShell({ children }: { children: ReactNode }) {
@@ -45,6 +46,16 @@ export default function App() {
           <ProtectedRoute>
             <AppShell>
               <ProjectBoardPage />
+            </AppShell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId/backlog"
+        element={
+          <ProtectedRoute>
+            <AppShell>
+              <BacklogPage />
             </AppShell>
           </ProtectedRoute>
         }

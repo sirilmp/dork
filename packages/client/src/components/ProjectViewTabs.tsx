@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
-export type ProjectView = 'board' | 'backlog' | 'list' | 'calendar';
+export type ProjectView = 'board' | 'backlog' | 'list' | 'calendar' | 'reports';
 
 const VIEWS: Array<{ id: ProjectView; label: string }> = [
   { id: 'board', label: 'Board' },
   { id: 'backlog', label: 'Backlog' },
   { id: 'list', label: 'List' },
   { id: 'calendar', label: 'Calendar' },
+  { id: 'reports', label: 'Reports' },
 ];
 
 /**

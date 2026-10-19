@@ -12,6 +12,7 @@ import { ProjectBoardPage } from './pages/ProjectBoardPage';
 import { BacklogPage } from './pages/BacklogPage';
 import { ProjectListPage } from './pages/ProjectListPage';
 import { ProjectCalendarPage } from './pages/ProjectCalendarPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { ProjectSettingsPage } from './pages/ProjectSettingsPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { FiltersPage } from './pages/FiltersPage';
@@ -93,6 +94,16 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <ProjectCalendarPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId/reports"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ReportsPage />
             </Layout>
           </ProtectedRoute>
         }

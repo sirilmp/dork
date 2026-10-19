@@ -15,6 +15,7 @@ import {
   Star,
   Users,
   Gauge,
+  LineChart,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -184,6 +185,15 @@ export function Sidebar({
 
   const recentProjectEntries = useMemo(() => entries.filter((e) => e.kind === 'project').slice(0, 5), [entries]);
 
+  // Reports is project-scoped (see ReportsPage), so the sidebar entry has no
+  // single global destination — it opens the most recently viewed project's
+  // reports, falling back to the first project overall, and is hidden
+  // entirely once there are no projects to report on.
+  const reportsHref = useMemo(() => {
+    const recentProjectId = recentProjectEntries[0]?.id ?? allProjects[0]?.id;
+    return recentProjectId ? `/projects/${recentProjectId}/reports` : null;
+  }, [recentProjectEntries, allProjects]);
+
   const recentProjectIds = useMemo(() => new Set(recentProjectEntries.map((e) => e.id)), [recentProjectEntries]);
   const moreProjects = useMemo(
     () => allProjects.filter((p) => !recentProjectIds.has(p.id)),
@@ -346,6 +356,7 @@ export function Sidebar({
 
         <NavRow to="/filters" icon={<ListFilter />} label="Filters" collapsed={collapsed} />
         <NavRow to="/workload" icon={<Gauge />} label="Workload" collapsed={collapsed} />
+        {reportsHref && <NavRow to={reportsHref} icon={<LineChart />} label="Reports" collapsed={collapsed} />}
         <NavRow to="/teams" icon={<Users />} label="Teams" collapsed={collapsed} />
 
         {user?.role === 'ADMIN' && (

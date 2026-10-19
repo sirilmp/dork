@@ -149,6 +149,21 @@ export interface BurndownResponse {
   points: BurndownPoint[];
 }
 
+export interface VelocityPoint {
+  sprintId: string;
+  sprintName: string;
+  committedPoints: number;
+  completedPoints: number;
+  completedAt: string;
+}
+
+export interface CFDPoint {
+  date: string;
+  todoCount: number;
+  inProgressCount: number;
+  doneCount: number;
+}
+
 export type CustomFieldType = 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT' | 'CHECKBOX';
 
 export interface CustomFieldDefinition {

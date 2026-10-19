@@ -19,6 +19,7 @@ import { meRouter } from './modules/me/me.routes';
 import { teamsReadRouter } from './modules/teams/teams.routes';
 import { customFieldsRouter } from './modules/custom-fields/custom-fields.routes';
 import { attachmentsRouter, issueAttachmentsRouter } from './modules/attachments/attachments.routes';
+import { crossProjectQueryRouter, filtersRouter, projectQueryRouter } from './modules/filters/filters.routes';
 
 const app = express();
 
@@ -39,6 +40,9 @@ app.use('/api/projects/:projectId/backlog', projectBacklogRouter);
 app.use('/api/sprints', sprintsRouter);
 app.use('/api/projects/:projectId/labels', labelsRouter);
 app.use('/api/projects/:projectId/custom-fields', customFieldsRouter);
+app.use('/api/projects/:projectId/query', projectQueryRouter);
+app.use('/api/issues/query', crossProjectQueryRouter);
+app.use('/api/filters', filtersRouter);
 app.use('/api/issues', issuesRouter);
 app.use('/api/issues/:issueId/comments', commentsRouter);
 app.use('/api/issues/:issueId/attachments', issueAttachmentsRouter);

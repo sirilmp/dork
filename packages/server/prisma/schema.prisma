@@ -105,6 +105,7 @@ model User {
   sentInvites       Invite[]        @relation("InvitedBy")
   starredProjects   StarredProject[]
   attachments       Attachment[]
+  savedFilters      SavedFilter[]
 
   @@index([email])
 }
@@ -174,6 +175,7 @@ model Project {
   workflowStatuses    WorkflowStatus[]
   workflowTransitions WorkflowTransition[]
   customFieldDefinitions CustomFieldDefinition[]
+  savedFilters        SavedFilter[]
 
   @@index([leadId])
 }
@@ -475,6 +477,28 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, read])
+}
+
+// A stored JQL-like query (see modules/filters). `projectId` null means the
+// filter runs cross-project, scoped at run time to whatever projects the
+// caller can see — see filters.service.ts's `resolveQueryScope`. `isShared`
+// makes it visible to every other member with access to that scope; an
+// unshared filter is visible only to its owner.
+model SavedFilter {
+  id        String   @id @default(uuid())
+  name      String
+  query     String
+  ownerId   String
+  projectId String?
+  isShared  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([projectId])
 }
 
 // Singleton row (id = "singleton") holding server-admin-configured branding.

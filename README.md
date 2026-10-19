@@ -133,8 +133,8 @@ configurable branding and SMTP, without touching code.
   (backend-persisted `StarredProject` model + `/api/me/starred` and
   `/api/projects/:id/star`, so — unlike Recent — it follows your account
   across devices), **Projects** (mirrors Jira's "Spaces": a Recent sub-list
-  plus an expandable "More projects"), **Filters**, **Workload**, **Teams**,
-  and **Admin Settings**
+  plus an expandable "More projects"), **Filters**, **Activity**, **Workload**,
+  **Teams**, and **Admin Settings**
   (admins only). Collapses to an icon-only rail (state persisted in
   `localStorage`) and falls back to a hamburger-triggered overlay on narrow
   viewports.
@@ -201,6 +201,13 @@ configurable branding and SMTP, without touching code.
   project-ADMIN role; everyone else still sees their own breakdown via the
   self-service `/me` endpoint, with a note that the fuller view needs
   project-admin access somewhere.
+- **Global activity feed** (`/activity`, `GET /api/activity`): a
+  reverse-chronological, cross-project, cross-issue stream of `ActivityLog`
+  entries (status/assignee/sprint/etc. changes), grouped by day, with
+  project/person filters and cursor-paginated "Load more". Access-scoped the
+  same way as Home/"For you": every project the caller belongs to, or every
+  project for a system ADMIN. Comments are not included — comment creation
+  doesn't write an `ActivityLog` row, so this is field-change history only.
 
 ## Query language reference
 
@@ -282,7 +289,6 @@ working foundation rather than a sprawling half-built app. Clear next steps:
 - Real-time updates (websockets) — the board currently relies on
   request/response + optimistic updates, not live push
 - Fine-grained per-field permissions beyond project roles
-- A global cross-project activity feed
 - Custom dashboard widgets — the Reports page above ships two fixed charts
   (velocity, cumulative flow diagram), not a general configurable
   widget/dashboard builder; still not built

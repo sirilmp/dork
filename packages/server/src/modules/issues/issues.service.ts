@@ -152,6 +152,10 @@ export const issueInclude = {
   // Full workflow status (not just the id) so board/backlog/etc. can render
   // name/category/color without a second round-trip.
   status: { select: { id: true, name: true, category: true, color: true, order: true } },
+  // Minimal parent summary so the client can bucket issues into epic
+  // swimlanes (an issue belongs to its parent's epic only when that parent
+  // is itself type EPIC) without a second round-trip per issue.
+  parent: { select: { id: true, type: true, title: true } },
   customFieldValues: true,
   attachments: {
     include: { uploadedBy: { select: { id: true, name: true, avatarUrl: true } } },

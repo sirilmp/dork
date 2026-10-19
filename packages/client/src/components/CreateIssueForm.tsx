@@ -18,12 +18,15 @@ export function CreateIssueForm({
   projectId,
   members,
   labels,
+  initialStatusId,
   onClose,
   onCreated,
 }: {
   projectId: string;
   members: UserSummary[];
   labels: LabelType[];
+  /** Pre-fills the issue's status, e.g. when created via a board column's "+". */
+  initialStatusId?: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -47,6 +50,7 @@ export function CreateIssueForm({
         type: type as any,
         priority: priority as any,
         assigneeId: assigneeId || null,
+        statusId: initialStatusId,
         labelIds,
       });
       onCreated();

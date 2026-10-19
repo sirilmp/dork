@@ -231,6 +231,10 @@ model WorkflowStatus {
   order     Int
   color     String?
   isDefault Boolean        @default(false)
+  // Optional WIP limit for this column. Purely advisory: the board flags a
+  // column that exceeds it (badge/border), it never blocks a drag-and-drop
+  // move, matching how Jira itself treats WIP limits.
+  wipLimit  Int?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 

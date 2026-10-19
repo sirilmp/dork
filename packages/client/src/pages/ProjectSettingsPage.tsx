@@ -101,6 +101,7 @@ function StatusRow({
   onCategoryChange,
   onSetDefault,
   onDelete,
+  onWipLimitChange,
 }: {
   status: WorkflowStatus;
   issueCount: number;
@@ -109,10 +110,12 @@ function StatusRow({
   onCategoryChange: (category: StatusCategory) => void;
   onSetDefault: () => void;
   onDelete: () => void;
+  onWipLimitChange: (wipLimit: number | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: status.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   const [name, setName] = useState(status.name);
+  const [wipLimit, setWipLimit] = useState(status.wipLimit != null ? String(status.wipLimit) : '');
 
   const deleteDisabled = issueCount > 0 || status.isDefault;
   const deleteReason =
@@ -149,6 +152,27 @@ function StatusRow({
         </SelectContent>
       </Select>
       <span className="text-xs text-muted-foreground">{issueCount} issue{issueCount === 1 ? '' : 's'}</span>
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor={`wip-${status.id}`} className="text-xs font-normal text-muted-foreground">
+          WIP limit
+        </Label>
+        <Input
+          id={`wip-${status.id}`}
+          type="number"
+          min={1}
+          placeholder="None"
+          value={wipLimit}
+          onChange={(e) => setWipLimit(e.target.value)}
+          onBlur={() => {
+            const trimmed = wipLimit.trim();
+            const parsed = trimmed === '' ? null : Math.max(1, parseInt(trimmed, 10));
+            if (parsed === status.wipLimit) return;
+            setWipLimit(parsed != null ? String(parsed) : '');
+            onWipLimitChange(parsed);
+          }}
+          className="h-8 w-20"
+        />
+      </div>
       <div className="ml-auto flex items-center gap-2">
         {status.isDefault ? (
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Default</span>
@@ -453,6 +477,16 @@ export function ProjectSettingsPage() {
                       await load();
                     }}
                     onDelete={() => handleDeleteStatus(status.id)}
+                    onWipLimitChange={async (wipLimit) => {
+                      if (!projectId) return;
+                      try {
+                        await workflowApi.updateStatus(projectId, status.id, { wipLimit });
+                        await load();
+                      } catch (err) {
+                        toast.error(err instanceof ApiError ? err.message : 'Failed to update WIP limit');
+                        await load();
+                      }
+                    }}
                   />
                 ))}
               </div>

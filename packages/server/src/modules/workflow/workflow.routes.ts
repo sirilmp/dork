@@ -28,6 +28,7 @@ const createStatusSchema = z.object({
   category: z.enum(['TODO', 'IN_PROGRESS', 'DONE']),
   color: z.string().max(20).nullable().optional(),
   isDefault: z.boolean().optional(),
+  wipLimit: z.number().int().min(1).nullable().optional(),
 });
 
 workflowRouter.post(
@@ -52,6 +53,7 @@ workflowRouter.post(
           color: input.color ?? undefined,
           order: nextOrder,
           isDefault: input.isDefault ?? false,
+          wipLimit: input.wipLimit ?? undefined,
         },
       });
     });
@@ -66,6 +68,7 @@ const updateStatusSchema = z.object({
   color: z.string().max(20).nullable().optional(),
   order: z.number().int().min(0).optional(),
   isDefault: z.boolean().optional(),
+  wipLimit: z.number().int().min(1).nullable().optional(),
 });
 
 async function loadStatusInProject(projectId: string, statusId: string) {
@@ -94,6 +97,7 @@ workflowRouter.patch(
           color: input.color,
           order: input.order,
           isDefault: input.isDefault,
+          wipLimit: input.wipLimit,
         },
       });
     });

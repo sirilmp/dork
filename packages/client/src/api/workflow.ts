@@ -5,7 +5,13 @@ export const workflowApi = {
   get: (projectId: string) => api.get<WorkflowResponse>(`/projects/${projectId}/workflow`),
   createStatus: (
     projectId: string,
-    input: { name: string; category: WorkflowStatus['category']; color?: string | null; isDefault?: boolean }
+    input: {
+      name: string;
+      category: WorkflowStatus['category'];
+      color?: string | null;
+      isDefault?: boolean;
+      wipLimit?: number | null;
+    }
   ) => api.post<WorkflowStatus>(`/projects/${projectId}/workflow/statuses`, input),
   updateStatus: (
     projectId: string,
@@ -16,6 +22,7 @@ export const workflowApi = {
       color: string | null;
       order: number;
       isDefault: boolean;
+      wipLimit: number | null;
     }>
   ) => api.patch<WorkflowStatus>(`/projects/${projectId}/workflow/statuses/${statusId}`, input),
   deleteStatus: (projectId: string, statusId: string) =>

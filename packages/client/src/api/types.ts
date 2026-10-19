@@ -15,6 +15,8 @@ export interface WorkflowStatus {
   order: number;
   color: string | null;
   isDefault: boolean;
+  /** Advisory WIP limit for this column; null means no limit. */
+  wipLimit: number | null;
 }
 
 export interface WorkflowTransition {
@@ -208,6 +210,10 @@ export interface Issue {
   assignee: UserSummary | null;
   reporter: UserSummary;
   labels?: Label[];
+  // Minimal parent summary (present whenever parentId is set) used by the
+  // board's epic swimlane grouping: an issue belongs to its parent's epic
+  // only when that parent's own type is EPIC.
+  parent?: { id: string; type: IssueType; title: string } | null;
   project: { id: string; key: string; name: string };
   customFields: IssueCustomField[];
   attachments: Attachment[];

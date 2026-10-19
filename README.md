@@ -107,6 +107,30 @@ configurable branding and SMTP, without touching code.
   (2) the system enforces a single-active-admin invariant: demoting,
   deactivating, or deleting the last remaining ADMIN is rejected, so a
   self-hosted instance can never be locked out of its own admin area.
+- **Rich text issue descriptions**: a focused [Tiptap](https://tiptap.dev)
+  editor (bold/italic/strike, bullet/numbered lists, blockquote, code block,
+  link) replaces the old plain-text description field, stored as Tiptap's
+  document JSON (`Issue.descriptionJson`) rather than HTML/markdown — the
+  client fully controls rendering, so there's no server-side HTML
+  sanitization to get wrong. A derived plain-text `description` is kept in
+  sync server-side on every save, for search/preview use.
+- **Custom fields**: project admins define extra per-project issue fields
+  (Text / Number / Date / Select / Checkbox, with a required toggle and
+  drag-to-reorder) from the project Settings page; they render alongside the
+  built-in Status/Assignee/Priority/Type fields on every issue in that
+  project, including unset ones, and values are validated server-side
+  against the field's type and (for Select) its options.
+- **Attachments**: upload files to an issue (any project member), download,
+  and delete (uploader or project admin). Stored on **local disk** by
+  default (`UPLOAD_DIR`, default `./uploads`) under a generated UUID
+  filename — never the original filename — with the original name/mime/size
+  recorded only in the database. Downloads are always served as
+  `application/octet-stream` with `Content-Disposition: attachment`
+  regardless of the stored mime type, so a maliciously-named upload (e.g. an
+  `.html`/`.svg` file) can never execute inline against this origin. Local
+  disk is the simplest option for a single-container self-host; a deployment
+  with multiple server replicas behind a load balancer would need shared or
+  networked storage instead (e.g. NFS, S3) — out of scope for this pass.
 
 ## Not yet implemented / Roadmap
 
@@ -116,8 +140,6 @@ working foundation rather than a sprawling half-built app. Clear next steps:
 - JQL-like advanced search / saved filters
 - Public REST API documentation and webhooks for third-party integrations
 - OAuth / SSO (Google, GitHub, SAML, OIDC)
-- Rich text / WYSIWYG issue descriptions (currently plain text; Markdown-ready)
-- File attachments on issues/comments
 - Real-time updates (websockets) — the board currently relies on
   request/response + optimistic updates, not live push
 - Fine-grained per-field permissions beyond project roles

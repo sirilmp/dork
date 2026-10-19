@@ -1,20 +1,44 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import type { JSONContent } from '@tiptap/react';
+import { Download, File as FileIcon, FileText, Image as ImageIcon, Paperclip, Trash2 } from 'lucide-react';
 import { issuesApi } from '../api/issues';
+import { attachmentsApi } from '../api/attachments';
 import { ApiError } from '../api/client';
-import { IssueDetail, Label as LabelType, UserSummary, WorkflowStatus } from '../api/types';
+import { Attachment, IssueDetail, Label as LabelType, ProjectMember, UserSummary, WorkflowStatus } from '../api/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Avatar } from '../components/Avatar';
-import { Textarea } from '../components/ui/textarea';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
+import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { DatePicker } from '../components/ui/date-picker';
+import { RichTextEditor } from '../components/richtext/RichTextEditor';
+import { RichTextRenderer } from '../components/richtext/RichTextRenderer';
 import { cn } from '../lib/utils';
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
+import { useAuth } from '../auth/AuthContext';
 
 const UNASSIGNED = '__unassigned__';
+
+function fileIconFor(mimeType: string) {
+  if (mimeType.startsWith('image/')) return ImageIcon;
+  if (mimeType === 'application/pdf' || mimeType.startsWith('text/')) return FileText;
+  return FileIcon;
+}
+
+function humanFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i += 1;
+  }
+  return `${value.toFixed(1)} ${units[i]}`;
+}
 
 function formatFieldValue(field: string, value: string | null): string {
   if (value === null) return field === 'assignee' ? 'Unassigned' : '—';
@@ -24,6 +48,7 @@ function formatFieldValue(field: string, value: string | null): string {
 export function IssueDetailModal({
   issueId,
   members,
+  projectMembers,
   labels,
   statuses,
   onClose,
@@ -31,23 +56,33 @@ export function IssueDetailModal({
 }: {
   issueId: string;
   members: UserSummary[];
+  /** Optional: used to gate the attachment delete button by the viewer's
+   * actual project role, matching the server's uploader-or-admin check. */
+  projectMembers?: ProjectMember[];
   labels: LabelType[];
   statuses: WorkflowStatus[];
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { user } = useAuth();
   const [issue, setIssue] = useState<IssueDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [descriptionDraft, setDescriptionDraft] = useState<JSONContent | null>(null);
   const [editingDescription, setEditingDescription] = useState(false);
   const [commentBody, setCommentBody] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { recordView } = useRecentlyViewed();
+
+  const isSystemAdmin = user?.role === 'ADMIN';
+  const myProjectRole = projectMembers?.find((m) => m.userId === user?.id)?.role;
+  const isProjectAdmin = isSystemAdmin || myProjectRole === 'ADMIN';
 
   async function load() {
     setLoading(true);
     const result = await issuesApi.get(issueId);
     setIssue(result);
-    setDescriptionDraft(result.description ?? '');
+    setDescriptionDraft((result.descriptionJson as JSONContent | null) ?? null);
     setLoading(false);
     // No deep-link route exists for a single issue yet, so "recent issue"
     // entries land back on its project's board, where the issue can be
@@ -78,8 +113,48 @@ export function IssueDetailModal({
   }
 
   async function handleSaveDescription() {
-    await updateField({ description: descriptionDraft });
+    await updateField({ descriptionJson: descriptionDraft ?? null });
     setEditingDescription(false);
+  }
+
+  async function handleCustomFieldChange(fieldDefinitionId: string, value: string | number | boolean | null) {
+    await updateField({ customFieldValues: [{ fieldDefinitionId, value }] });
+  }
+
+  async function handleUpload(file: File) {
+    if (!issue) return;
+    setUploading(true);
+    try {
+      const attachment = await attachmentsApi.upload(issue.id, file);
+      setIssue((prev) => (prev ? { ...prev, attachments: [...prev.attachments, attachment] } : prev));
+      toast.success(`${file.name} uploaded.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to upload file.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDeleteAttachment(attachment: Attachment) {
+    if (!issue) return;
+    if (!window.confirm(`Delete "${attachment.fileName}"?`)) return;
+    try {
+      await attachmentsApi.remove(attachment.id);
+      setIssue((prev) =>
+        prev ? { ...prev, attachments: prev.attachments.filter((a) => a.id !== attachment.id) } : prev
+      );
+      toast.success('Attachment deleted.');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to delete attachment.');
+    }
+  }
+
+  async function handleDownloadAttachment(attachment: Attachment) {
+    try {
+      await attachmentsApi.download(attachment);
+    } catch {
+      toast.error('Failed to download attachment.');
+    }
   }
 
   async function handleAddComment(e: FormEvent) {
@@ -131,12 +206,10 @@ export function IssueDetailModal({
                   <h3 className="mb-1 text-sm font-semibold text-muted-foreground">Description</h3>
                   {editingDescription ? (
                     <div className="flex flex-col gap-2">
-                      <Textarea
+                      <RichTextEditor
                         autoFocus
-                        rows={6}
-                        value={descriptionDraft}
-                        onChange={(e) => setDescriptionDraft(e.target.value)}
-                        placeholder="Markdown supported in a future pass — plain text for now."
+                        content={descriptionDraft}
+                        onChange={setDescriptionDraft}
                       />
                       <div className="flex gap-2">
                         <Button size="sm" onClick={handleSaveDescription}>
@@ -147,12 +220,19 @@ export function IssueDetailModal({
                           variant="ghost"
                           onClick={() => {
                             setEditingDescription(false);
-                            setDescriptionDraft(issue.description ?? '');
+                            setDescriptionDraft((issue.descriptionJson as JSONContent | null) ?? null);
                           }}
                         >
                           Cancel
                         </Button>
                       </div>
+                    </div>
+                  ) : issue.descriptionJson ? (
+                    <div
+                      onClick={() => setEditingDescription(true)}
+                      className="cursor-text rounded-md border border-transparent px-2 py-1 hover:border-border"
+                    >
+                      <RichTextRenderer content={issue.descriptionJson} />
                     </div>
                   ) : (
                     <p
@@ -162,6 +242,73 @@ export function IssueDetailModal({
                       {issue.description || 'Click to add a description...'}
                     </p>
                   )}
+                </div>
+
+                <div className="mb-6">
+                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+                    Attachments ({issue.attachments.length})
+                  </h3>
+                  <div className="mb-2 flex flex-col gap-2">
+                    {issue.attachments.map((attachment) => {
+                      const Icon = fileIconFor(attachment.mimeType);
+                      const canDelete = isProjectAdmin || attachment.uploadedById === user?.id;
+                      return (
+                        <div
+                          key={attachment.id}
+                          className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                        >
+                          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-foreground">{attachment.fileName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {humanFileSize(attachment.sizeBytes)} · {attachment.uploadedBy.name} ·{' '}
+                              {new Date(attachment.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Download"
+                            onClick={() => handleDownloadAttachment(attachment)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Delete"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteAttachment(attachment)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {issue.attachments.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No attachments yet.</p>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUpload(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Paperclip className="h-4 w-4" /> {uploading ? 'Uploading...' : 'Attach a file'}
+                  </Button>
                 </div>
 
                 <div className="mb-6">
@@ -302,6 +449,61 @@ export function IssueDetailModal({
                     })}
                   </div>
                 </div>
+
+                {issue.customFields.length > 0 && (
+                  <div className="flex flex-col gap-4 border-t border-border pt-4">
+                    {issue.customFields.map((field) => (
+                      <div key={field.id} className="flex flex-col gap-1.5">
+                        <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                          {field.name}
+                          {field.required && <span className="text-destructive"> *</span>}
+                        </Label>
+                        {field.fieldType === 'TEXT' && (
+                          <Input
+                            value={(field.value as string) ?? ''}
+                            onChange={(e) => handleCustomFieldChange(field.id, e.target.value || null)}
+                          />
+                        )}
+                        {field.fieldType === 'NUMBER' && (
+                          <Input
+                            type="number"
+                            value={field.value === null ? '' : (field.value as number)}
+                            onChange={(e) =>
+                              handleCustomFieldChange(field.id, e.target.value === '' ? null : Number(e.target.value))
+                            }
+                          />
+                        )}
+                        {field.fieldType === 'DATE' && (
+                          <DatePicker
+                            value={field.value as string | null}
+                            onChange={(v) => handleCustomFieldChange(field.id, v)}
+                          />
+                        )}
+                        {field.fieldType === 'CHECKBOX' && (
+                          <Checkbox
+                            checked={Boolean(field.value)}
+                            onCheckedChange={(checked) => handleCustomFieldChange(field.id, checked === true)}
+                          />
+                        )}
+                        {field.fieldType === 'SELECT' && (
+                          <Select
+                            value={(field.value as string) ?? undefined}
+                            onValueChange={(v) => handleCustomFieldChange(field.id, v)}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                            <SelectContent>
+                              {(field.options ?? []).map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="text-xs text-muted-foreground">
                   Reporter: <span className="font-medium text-foreground">{issue.reporter.name}</span>

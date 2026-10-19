@@ -21,6 +21,7 @@ function toQuery(filters: IssueFilters = {}): string {
 export interface IssueInput {
   title: string;
   description?: string;
+  descriptionJson?: Record<string, unknown> | null;
   type?: IssueType;
   priority?: IssuePriority;
   statusId?: string;
@@ -29,6 +30,7 @@ export interface IssueInput {
   storyPoints?: number | null;
   dueDate?: string | null;
   labelIds?: string[];
+  customFieldValues?: Array<{ fieldDefinitionId: string; value: string | number | boolean | null }>;
 }
 
 export const issuesApi = {

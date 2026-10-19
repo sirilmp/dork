@@ -202,6 +202,7 @@ export function ProjectBoardPage() {
         <IssueDetailModal
           issueId={openIssueId}
           members={project.members.map((m) => m.user)}
+          projectMembers={project.members}
           labels={project.labels}
           statuses={columns.map((c) => c.status)}
           onClose={() => setOpenIssueId(null)}

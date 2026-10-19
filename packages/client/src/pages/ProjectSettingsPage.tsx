@@ -14,8 +14,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { projectsApi } from '../api/projects';
 import { issuesApi } from '../api/issues';
 import { workflowApi } from '../api/workflow';
+import { customFieldsApi } from '../api/custom-fields';
 import { ApiError } from '../api/client';
-import { Project, StatusCategory, WorkflowStatus } from '../api/types';
+import { CustomFieldDefinition, CustomFieldType, Project, StatusCategory, WorkflowStatus } from '../api/types';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -31,6 +32,66 @@ const CATEGORY_LABEL: Record<StatusCategory, string> = {
   IN_PROGRESS: 'In Progress',
   DONE: 'Done',
 };
+
+const FIELD_TYPE_LABEL: Record<CustomFieldType, string> = {
+  TEXT: 'Text',
+  NUMBER: 'Number',
+  DATE: 'Date',
+  SELECT: 'Select',
+  CHECKBOX: 'Checkbox',
+};
+
+function CustomFieldRow({
+  field,
+  onRename,
+  onToggleRequired,
+  onDelete,
+}: {
+  field: CustomFieldDefinition;
+  onRename: (name: string) => void;
+  onToggleRequired: (required: boolean) => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const [name, setName] = useState(field.name);
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-md border border-border bg-card p-2">
+      <button type="button" {...attributes} {...listeners} className="cursor-grab text-muted-foreground touch-none">
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <Input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => name.trim() && name !== field.name && onRename(name.trim())}
+        className="h-8 w-44"
+      />
+      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        {FIELD_TYPE_LABEL[field.fieldType]}
+      </span>
+      {field.fieldType === 'SELECT' && (
+        <span className="truncate text-xs text-muted-foreground" title={(field.options ?? []).join(', ')}>
+          {(field.options ?? []).join(', ')}
+        </span>
+      )}
+      <div className="ml-auto flex items-center gap-3">
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Switch checked={field.required} onCheckedChange={onToggleRequired} />
+          Required
+        </label>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onDelete}
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function StatusRow({
   status,
@@ -129,6 +190,13 @@ export function ProjectSettingsPage() {
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState<StatusCategory>('TODO');
 
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>([]);
+  const [showAddField, setShowAddField] = useState(false);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<CustomFieldType>('TEXT');
+  const [newFieldOptions, setNewFieldOptions] = useState('');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   function allStatusesAllowedMap(list: WorkflowStatus[]): Map<string, Set<string>> {
@@ -140,13 +208,15 @@ export function ProjectSettingsPage() {
   async function load() {
     if (!projectId) return;
     setLoading(true);
-    const [projectResult, workflowResult, boardResult] = await Promise.all([
+    const [projectResult, workflowResult, boardResult, customFieldsResult] = await Promise.all([
       projectsApi.get(projectId),
       workflowApi.get(projectId),
       issuesApi.board(projectId),
+      customFieldsApi.list(projectId),
     ]);
     setProject(projectResult);
     setStatuses(workflowResult.statuses);
+    setCustomFields(customFieldsResult);
     setIssueCounts(
       Object.fromEntries(boardResult.columns.map((c) => [c.status.id, c.issues.length]))
     );
@@ -212,6 +282,62 @@ export function ProjectSettingsPage() {
       toast.success('Status deleted.');
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Failed to delete status');
+    }
+  }
+
+  async function handleFieldDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !projectId) return;
+    const oldIndex = customFields.findIndex((f) => f.id === active.id);
+    const newIndex = customFields.findIndex((f) => f.id === over.id);
+    const reordered = arrayMove(customFields, oldIndex, newIndex);
+    setCustomFields(reordered);
+    try {
+      await Promise.all(reordered.map((f, index) => customFieldsApi.update(projectId, f.id, { order: index })));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to reorder custom fields');
+      await load();
+    }
+  }
+
+  async function handleAddField() {
+    if (!projectId || !newFieldName.trim()) return;
+    const options = newFieldOptions
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
+    if (newFieldType === 'SELECT' && options.length === 0) {
+      toast.error('Add at least one option for a Select field.');
+      return;
+    }
+    try {
+      await customFieldsApi.create(projectId, {
+        name: newFieldName.trim(),
+        fieldType: newFieldType,
+        options: newFieldType === 'SELECT' ? options : undefined,
+        required: newFieldRequired,
+      });
+      setNewFieldName('');
+      setNewFieldOptions('');
+      setNewFieldRequired(false);
+      setNewFieldType('TEXT');
+      setShowAddField(false);
+      await load();
+      toast.success('Custom field added.');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to add custom field');
+    }
+  }
+
+  async function handleDeleteField(id: string) {
+    if (!projectId) return;
+    if (!window.confirm('Delete this custom field? Its values on all issues will be lost.')) return;
+    try {
+      await customFieldsApi.remove(projectId, id);
+      await load();
+      toast.success('Custom field deleted.');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to delete custom field');
     }
   }
 
@@ -329,6 +455,93 @@ export function ProjectSettingsPage() {
                     onDelete={() => handleDeleteStatus(status.id)}
                   />
                 ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle>Custom fields</CardTitle>
+          <Dialog open={showAddField} onOpenChange={setShowAddField}>
+            <Button onClick={() => setShowAddField(true)}>
+              <Plus className="h-4 w-4" /> Add field
+            </Button>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Add custom field</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="field-name">Name</Label>
+                  <Input id="field-name" autoFocus value={newFieldName} onChange={(e) => setNewFieldName(e.target.value)} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Type</Label>
+                  <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as CustomFieldType)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TEXT">{FIELD_TYPE_LABEL.TEXT}</SelectItem>
+                      <SelectItem value="NUMBER">{FIELD_TYPE_LABEL.NUMBER}</SelectItem>
+                      <SelectItem value="DATE">{FIELD_TYPE_LABEL.DATE}</SelectItem>
+                      <SelectItem value="SELECT">{FIELD_TYPE_LABEL.SELECT}</SelectItem>
+                      <SelectItem value="CHECKBOX">{FIELD_TYPE_LABEL.CHECKBOX}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newFieldType === 'SELECT' && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="field-options">Options (comma-separated)</Label>
+                    <Input
+                      id="field-options"
+                      value={newFieldOptions}
+                      onChange={(e) => setNewFieldOptions(e.target.value)}
+                      placeholder="Small, Medium, Large"
+                    />
+                  </div>
+                )}
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <Switch checked={newFieldRequired} onCheckedChange={setNewFieldRequired} />
+                  Required
+                </label>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setShowAddField(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddField}>Add</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Extra fields shown on every issue in this project, in the order below. Drag to reorder.
+          </p>
+          <DndContext sensors={sensors} onDragEnd={handleFieldDragEnd}>
+            <SortableContext items={customFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+              <div className="flex flex-col gap-2">
+                {customFields.map((field) => (
+                  <CustomFieldRow
+                    key={field.id}
+                    field={field}
+                    onRename={async (name) => {
+                      if (!projectId) return;
+                      await customFieldsApi.update(projectId, field.id, { name });
+                      await load();
+                    }}
+                    onToggleRequired={async (required) => {
+                      if (!projectId) return;
+                      await customFieldsApi.update(projectId, field.id, { required });
+                      await load();
+                    }}
+                    onDelete={() => handleDeleteField(field.id)}
+                  />
+                ))}
+                {customFields.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No custom fields yet.</p>
+                )}
               </div>
             </SortableContext>
           </DndContext>

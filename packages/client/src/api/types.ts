@@ -147,6 +147,42 @@ export interface BurndownResponse {
   points: BurndownPoint[];
 }
 
+export type CustomFieldType = 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT' | 'CHECKBOX';
+
+export interface CustomFieldDefinition {
+  id: string;
+  projectId: string;
+  name: string;
+  fieldType: CustomFieldType;
+  options: string[] | null;
+  required: boolean;
+  order: number;
+}
+
+// A project's custom field definition paired with this issue's value (or
+// null when unset) — always the full set, from serializeIssue's join.
+export interface IssueCustomField {
+  id: string;
+  name: string;
+  fieldType: CustomFieldType;
+  options: string[] | null;
+  required: boolean;
+  order: number;
+  value: string | number | boolean | null;
+}
+
+export interface Attachment {
+  id: string;
+  issueId: string;
+  uploadedById: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  storageKey: string;
+  createdAt: string;
+  uploadedBy: { id: string; name: string; avatarUrl: string | null };
+}
+
 export interface Issue {
   id: string;
   key: string;
@@ -155,6 +191,7 @@ export interface Issue {
   type: IssueType;
   title: string;
   description: string | null;
+  descriptionJson: Record<string, unknown> | null;
   statusId: string;
   status: IssueStatusRef;
   priority: IssuePriority;
@@ -172,6 +209,8 @@ export interface Issue {
   reporter: UserSummary;
   labels?: Label[];
   project: { id: string; key: string; name: string };
+  customFields: IssueCustomField[];
+  attachments: Attachment[];
   _count?: { comments: number; children: number };
 }
 

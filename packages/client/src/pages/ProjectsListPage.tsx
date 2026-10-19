@@ -1,8 +1,16 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AlertCircle } from 'lucide-react';
 import { projectsApi } from '../api/projects';
 import { Project } from '../api/types';
 import { ApiError } from '../api/client';
+import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Card } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
 
 export function ProjectsListPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -40,62 +48,64 @@ export function ProjectsListPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-800">Projects</h1>
-        <button
-          onClick={() => setShowCreate((v) => !v)}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
-          {showCreate ? 'Cancel' : 'New project'}
-        </button>
+        <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
+        <Button onClick={() => setShowCreate(true)}>New project</Button>
       </div>
 
-      {showCreate && (
-        <form onSubmit={handleCreate} className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Project name
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Key (optional)
-            <input
-              value={key}
-              onChange={(e) => setKey(e.target.value.toUpperCase())}
-              placeholder="e.g. PROJ"
-              className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <button type="submit" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-            Create
-          </button>
-          {error && <p className="w-full text-sm text-red-600">{error}</p>}
-        </form>
-      )}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New project</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="project-name">Project name</Label>
+              <Input id="project-name" required value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="project-key">Key (optional)</Label>
+              <Input
+                id="project-key"
+                value={key}
+                onChange={(e) => setKey(e.target.value.toUpperCase())}
+                placeholder="e.g. PROJ"
+                className="w-28"
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Create</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {loading ? (
-        <p className="text-slate-500">Loading projects...</p>
+        <p className="text-muted-foreground">Loading projects...</p>
       ) : projects.length === 0 ? (
-        <p className="text-slate-500">No projects yet. Create one to get started.</p>
+        <p className="text-muted-foreground">No projects yet. Create one to get started.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
-            <Link
-              key={project.id}
-              to={`/projects/${project.id}/board`}
-              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-primary"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                  {project.key}
-                </span>
-                <span className="text-xs text-slate-400">{project._count?.issues ?? 0} issues</span>
-              </div>
-              <h2 className="font-semibold text-slate-800">{project.name}</h2>
-              {project.description && <p className="mt-1 text-sm text-slate-500 line-clamp-2">{project.description}</p>}
+            <Link key={project.id} to={`/projects/${project.id}/board`}>
+              <Card className="h-full p-4 transition-colors hover:border-primary">
+                <div className="mb-2 flex items-center justify-between">
+                  <Badge variant="secondary">{project.key}</Badge>
+                  <span className="text-xs text-muted-foreground">{project._count?.issues ?? 0} issues</span>
+                </div>
+                <h2 className="font-semibold text-foreground">{project.name}</h2>
+                {project.description && (
+                  <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+                )}
+              </Card>
             </Link>
           ))}
         </div>

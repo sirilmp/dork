@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { issuesApi } from '../api/issues';
@@ -10,6 +11,7 @@ import { FilterBar, BoardFilters } from '../components/FilterBar';
 import { IssueCard } from '../components/IssueCard';
 import { IssueDetailModal } from './IssueDetailModal';
 import { CreateIssueForm } from '../components/CreateIssueForm';
+import { Button } from '../components/ui/button';
 
 const STATUSES: IssueStatus[] = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
@@ -120,35 +122,31 @@ export function ProjectBoardPage() {
         orderedIssueIds: newDestIssues.map((i) => i.id),
       });
     } catch {
-      // Roll back on failure.
+      // Roll back on failure and let the user know the move didn't stick.
+      toast.error('Failed to move issue. Reverted to the last saved state.');
       await load();
     }
   }
 
   if (loading || !project) {
-    return <div className="px-4 py-8 text-slate-500">Loading board...</div>;
+    return <div className="px-4 py-8 text-muted-foreground">Loading board...</div>;
   }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-800">
-            {project.name} <span className="text-slate-400">({project.key})</span>
+          <h1 className="text-xl font-semibold text-foreground">
+            {project.name} <span className="text-muted-foreground">({project.key})</span>
           </h1>
           <div className="mt-1 flex gap-3 text-sm">
             <span className="font-medium text-primary">Board</span>
-            <Link to={`/projects/${project.id}/backlog`} className="text-slate-500 hover:text-primary">
+            <Link to={`/projects/${project.id}/backlog`} className="text-muted-foreground hover:text-primary">
               Backlog
             </Link>
           </div>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
-          Create issue
-        </button>
+        <Button onClick={() => setShowCreate(true)}>Create issue</Button>
       </div>
 
       <FilterBar

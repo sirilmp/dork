@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -18,10 +20,18 @@ import { ApiError } from '../api/client';
 import { BacklogResponse, BurndownResponse, Issue, Project, Sprint, SprintWithIssues } from '../api/types';
 import { IssueTypeBadge, PriorityBadge } from '../components/Badge';
 import { Avatar } from '../components/Avatar';
-import { Modal } from '../components/Modal';
 import { SprintBurndownChart } from '../components/SprintBurndownChart';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
+import { Label } from '../components/ui/label';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Badge } from '../components/ui/badge';
 
 const BACKLOG_ID = 'backlog';
+const BACKLOG_OPTION = '__backlog__';
 
 type Section = { id: string; sprint: SprintWithIssues | null; issues: Issue[] };
 
@@ -42,19 +52,15 @@ function BacklogIssueRow({ issue, onOpen }: { issue: Issue; onOpen: (issue: Issu
       {...attributes}
       {...listeners}
       onClick={() => onOpen(issue)}
-      className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 hover:border-primary"
+      className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 hover:border-primary"
     >
       <div className="flex min-w-0 items-center gap-2">
         <IssueTypeBadge type={issue.type} />
-        <span className="shrink-0 text-xs text-slate-400">{issue.key}</span>
-        <span className="truncate text-sm font-medium text-slate-800">{issue.title}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{issue.key}</span>
+        <span className="truncate text-sm font-medium text-card-foreground">{issue.title}</span>
       </div>
       <div className="flex shrink-0 items-center gap-3">
-        {issue.storyPoints != null && (
-          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600">
-            {issue.storyPoints} pt
-          </span>
-        )}
+        {issue.storyPoints != null && <Badge variant="secondary">{issue.storyPoints} pt</Badge>}
         <PriorityBadge priority={issue.priority} />
         <Avatar user={issue.assignee} size={22} />
       </div>
@@ -83,17 +89,17 @@ function SectionContainer({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50">
+    <div className="mb-4 rounded-lg border border-border bg-muted/40">
       <div className="flex items-center justify-between gap-3 px-3 py-2">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2 text-left text-sm font-semibold text-slate-700"
+          className="flex items-center gap-2 text-left text-sm font-semibold text-foreground"
         >
-          <span className="text-slate-400">{open ? '▾' : '▸'}</span>
+          {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
           {title}
-          <span className="rounded-full bg-slate-200 px-2 text-xs font-normal text-slate-500">{issues.length}</span>
-          {subtitle && <span className="text-xs font-normal text-slate-400">{subtitle}</span>}
+          <Badge variant="secondary" className="font-normal">{issues.length}</Badge>
+          {subtitle && <span className="text-xs font-normal text-muted-foreground">{subtitle}</span>}
         </button>
         <div className="flex items-center gap-2">{headerRight}</div>
       </div>
@@ -107,7 +113,7 @@ function SectionContainer({
           >
             <SortableContext items={issues.map((i) => i.id)} strategy={verticalListSortingStrategy}>
               {issues.length === 0 ? (
-                <p className="px-2 py-3 text-xs text-slate-400">No issues here yet. Drag one in.</p>
+                <p className="px-2 py-3 text-xs text-muted-foreground">No issues here yet. Drag one in.</p>
               ) : (
                 issues.map((issue) => <BacklogIssueRow key={issue.id} issue={issue} onOpen={() => {}} />)
               )}
@@ -140,43 +146,37 @@ function CreateSprintForm({ projectId, onClose, onCreated }: { projectId: string
   }
 
   return (
-    <Modal open onClose={onClose} widthClassName="max-w-md">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
-        <h2 className="text-lg font-semibold">Create sprint</h2>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Name
-          <input
-            required
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Goal (optional)
-          <textarea
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-            rows={3}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm font-medium text-slate-600">
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-          >
-            {submitting ? 'Creating...' : 'Create sprint'}
-          </button>
-        </div>
-      </form>
-    </Modal>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create sprint</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="sprint-name">Name</Label>
+            <Input id="sprint-name" required autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="sprint-goal">Goal (optional)</Label>
+            <Textarea id="sprint-goal" value={goal} onChange={(e) => setGoal(e.target.value)} rows={3} />
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? 'Creating...' : 'Create sprint'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -198,36 +198,40 @@ function StartSprintDialog({ sprint, onClose, onStarted }: { sprint: Sprint; onC
   }
 
   return (
-    <Modal open onClose={onClose} widthClassName="max-w-sm">
-      <div className="flex flex-col gap-4 p-6">
-        <h2 className="text-lg font-semibold">Start "{sprint.name}"</h2>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Duration (days)
-          <input
-            type="number"
-            min={1}
-            max={90}
-            value={durationDays}
-            onChange={(e) => setDurationDays(Number(e.target.value))}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm font-medium text-slate-600">
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={handleStart}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-          >
-            {submitting ? 'Starting...' : 'Start sprint'}
-          </button>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Start "{sprint.name}"</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="sprint-duration">Duration (days)</Label>
+            <Input
+              id="sprint-duration"
+              type="number"
+              min={1}
+              max={90}
+              value={durationDays}
+              onChange={(e) => setDurationDays(Number(e.target.value))}
+            />
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={submitting} onClick={handleStart}>
+              {submitting ? 'Starting...' : 'Start sprint'}
+            </Button>
+          </DialogFooter>
         </div>
-      </div>
-    </Modal>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -259,43 +263,49 @@ function CompleteSprintDialog({
   }
 
   return (
-    <Modal open onClose={onClose} widthClassName="max-w-sm">
-      <div className="flex flex-col gap-4 p-6">
-        <h2 className="text-lg font-semibold">Complete "{sprint.name}"</h2>
-        <p className="text-sm text-slate-600">
-          Issues not marked Done will be moved to the backlog, unless you choose another sprint below.
-        </p>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Move incomplete issues to
-          <select
-            value={moveToSprintId}
-            onChange={(e) => setMoveToSprintId(e.target.value)}
-            className="rounded-md border border-slate-300 px-2 py-2 text-sm"
-          >
-            <option value="">Backlog</option>
-            {plannedSprints.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm font-medium text-slate-600">
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={handleComplete}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-          >
-            {submitting ? 'Completing...' : 'Complete sprint'}
-          </button>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Complete "{sprint.name}"</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-muted-foreground">
+            Issues not marked Done will be moved to the backlog, unless you choose another sprint below.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <Label>Move incomplete issues to</Label>
+            <Select
+              value={moveToSprintId || BACKLOG_OPTION}
+              onValueChange={(v) => setMoveToSprintId(v === BACKLOG_OPTION ? '' : v)}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={BACKLOG_OPTION}>Backlog</SelectItem>
+                {plannedSprints.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={submitting} onClick={handleComplete}>
+              {submitting ? 'Completing...' : 'Complete sprint'}
+            </Button>
+          </DialogFooter>
         </div>
-      </div>
-    </Modal>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -310,11 +320,11 @@ function BurndownPanel({ sprintId }: { sprintId: string }) {
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load burndown'));
   }, [sprintId]);
 
-  if (error) return <p className="px-3 pb-3 text-xs text-red-600">{error}</p>;
-  if (!data) return <p className="px-3 pb-3 text-xs text-slate-400">Loading burndown...</p>;
+  if (error) return <p className="px-3 pb-3 text-xs text-destructive">{error}</p>;
+  if (!data) return <p className="px-3 pb-3 text-xs text-muted-foreground">Loading burndown...</p>;
 
   return (
-    <div className="border-t border-slate-200 bg-white px-3 py-3">
+    <div className="border-t border-border bg-card px-3 py-3">
       <SprintBurndownChart points={data.points} totalPoints={data.totalPoints} />
     </div>
   );
@@ -386,6 +396,7 @@ export function BacklogPage() {
           orderedIssueIds: reordered.map((i) => i.id),
         });
       } catch {
+        toast.error('Failed to reorder backlog. Reverted to the last saved state.');
         await load();
       }
       return;
@@ -429,34 +440,30 @@ export function BacklogPage() {
         });
       }
     } catch {
+      toast.error('Failed to move issue. Reverted to the last saved state.');
       await load();
     }
   }
 
   if (loading || !project || !data) {
-    return <div className="px-4 py-8 text-slate-500">Loading backlog...</div>;
+    return <div className="px-4 py-8 text-muted-foreground">Loading backlog...</div>;
   }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-800">
-            {project.name} <span className="text-slate-400">({project.key})</span>
+          <h1 className="text-xl font-semibold text-foreground">
+            {project.name} <span className="text-muted-foreground">({project.key})</span>
           </h1>
           <div className="mt-1 flex gap-3 text-sm">
-            <Link to={`/projects/${project.id}/board`} className="text-slate-500 hover:text-primary">
+            <Link to={`/projects/${project.id}/board`} className="text-muted-foreground hover:text-primary">
               Board
             </Link>
             <span className="font-medium text-primary">Backlog</span>
           </div>
         </div>
-        <button
-          onClick={() => setShowCreateSprint(true)}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
-          Create sprint
-        </button>
+        <Button onClick={() => setShowCreateSprint(true)}>Create sprint</Button>
       </div>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -473,23 +480,17 @@ export function BacklogPage() {
                 issues={section.issues}
                 headerRight={
                   sprint.status === 'PLANNED' ? (
-                    <button
-                      onClick={() => setStartingSprint(sprint)}
-                      className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:border-primary hover:text-primary"
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setStartingSprint(sprint)}>
                       Start sprint
-                    </button>
+                    </Button>
                   ) : (
-                    <button
-                      onClick={() => setCompletingSprint(sprint)}
-                      className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:border-primary hover:text-primary"
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setCompletingSprint(sprint)}>
                       Complete sprint
-                    </button>
+                    </Button>
                   )
                 }
               >
-                {sprint.goal && <p className="px-3 pb-2 text-xs text-slate-500">Goal: {sprint.goal}</p>}
+                {sprint.goal && <p className="px-3 pb-2 text-xs text-muted-foreground">Goal: {sprint.goal}</p>}
                 {sprint.status === 'ACTIVE' && <BurndownPanel sprintId={sprint.id} />}
               </SectionContainer>
             );
@@ -537,7 +538,7 @@ export function BacklogPage() {
       )}
 
       {!activeSprint && plannedSprints.length === 0 && data.backlog.length === 0 && (
-        <p className="text-sm text-slate-500">No sprints or backlog issues yet.</p>
+        <p className="text-sm text-muted-foreground">No sprints or backlog issues yet.</p>
       )}
     </div>
   );

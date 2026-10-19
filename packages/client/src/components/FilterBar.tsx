@@ -1,4 +1,8 @@
+import { Search, X } from 'lucide-react';
 import { Label, UserSummary, IssueType } from '../api/types';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Button } from './ui/button';
 
 export interface BoardFilters {
   assigneeId?: string;
@@ -6,6 +10,8 @@ export interface BoardFilters {
   type?: IssueType;
   search?: string;
 }
+
+const ANY = '__any__';
 
 export function FilterBar({
   filters,
@@ -20,55 +26,66 @@ export function FilterBar({
 }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <input
-        placeholder="Search issues..."
-        value={filters.search ?? ''}
-        onChange={(e) => onChange({ ...filters, search: e.target.value })}
-        className="w-56 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
-      />
-      <select
-        value={filters.assigneeId ?? ''}
-        onChange={(e) => onChange({ ...filters, assigneeId: e.target.value || undefined })}
-        className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+      <div className="relative w-56">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search issues..."
+          value={filters.search ?? ''}
+          onChange={(e) => onChange({ ...filters, search: e.target.value })}
+          className="pl-8"
+        />
+      </div>
+
+      <Select
+        value={filters.assigneeId ?? ANY}
+        onValueChange={(v) => onChange({ ...filters, assigneeId: v === ANY ? undefined : v })}
       >
-        <option value="">Any assignee</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
-      <select
-        value={filters.labelId ?? ''}
-        onChange={(e) => onChange({ ...filters, labelId: e.target.value || undefined })}
-        className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+        <SelectTrigger className="w-40"><SelectValue placeholder="Any assignee" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any assignee</SelectItem>
+          {members.map((m) => (
+            <SelectItem key={m.id} value={m.id}>
+              {m.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.labelId ?? ANY}
+        onValueChange={(v) => onChange({ ...filters, labelId: v === ANY ? undefined : v })}
       >
-        <option value="">Any label</option>
-        {labels.map((l) => (
-          <option key={l.id} value={l.id}>
-            {l.name}
-          </option>
-        ))}
-      </select>
-      <select
-        value={filters.type ?? ''}
-        onChange={(e) => onChange({ ...filters, type: (e.target.value || undefined) as IssueType | undefined })}
-        className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+        <SelectTrigger className="w-36"><SelectValue placeholder="Any label" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any label</SelectItem>
+          {labels.map((l) => (
+            <SelectItem key={l.id} value={l.id}>
+              {l.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.type ?? ANY}
+        onValueChange={(v) => onChange({ ...filters, type: v === ANY ? undefined : (v as IssueType) })}
       >
-        <option value="">Any type</option>
-        <option value="EPIC">Epic</option>
-        <option value="STORY">Story</option>
-        <option value="TASK">Task</option>
-        <option value="BUG">Bug</option>
-        <option value="SUBTASK">Subtask</option>
-      </select>
+        <SelectTrigger className="w-32"><SelectValue placeholder="Any type" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any type</SelectItem>
+          <SelectItem value="EPIC">Epic</SelectItem>
+          <SelectItem value="STORY">Story</SelectItem>
+          <SelectItem value="TASK">Task</SelectItem>
+          <SelectItem value="BUG">Bug</SelectItem>
+          <SelectItem value="SUBTASK">Subtask</SelectItem>
+        </SelectContent>
+      </Select>
+
       {(filters.assigneeId || filters.labelId || filters.type || filters.search) && (
-        <button
-          onClick={() => onChange({})}
-          className="text-sm font-medium text-accent hover:underline"
-        >
+        <Button variant="ghost" size="sm" onClick={() => onChange({})} className="text-accent hover:text-accent">
+          <X />
           Clear filters
-        </button>
+        </Button>
       )}
     </div>
   );

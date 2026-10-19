@@ -1,8 +1,18 @@
 import { FormEvent, useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { issuesApi } from '../api/issues';
-import { Label, UserSummary } from '../api/types';
-import { Modal } from './Modal';
+import { Label as LabelType, UserSummary } from '../api/types';
 import { ApiError } from '../api/client';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
+import { Button } from './ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Alert, AlertDescription } from './ui/alert';
+import { cn } from '../lib/utils';
+
+const UNASSIGNED = '__unassigned__';
 
 export function CreateIssueForm({
   projectId,
@@ -13,7 +23,7 @@ export function CreateIssueForm({
 }: {
   projectId: string;
   members: UserSummary[];
-  labels: Label[];
+  labels: LabelType[];
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -48,107 +58,117 @@ export function CreateIssueForm({
   }
 
   return (
-    <Modal open onClose={onClose}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
-        <h2 className="text-lg font-semibold">Create issue</h2>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Create issue</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="issue-title">Title</Label>
+            <Input id="issue-title" required autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Title
-          <input
-            required
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="issue-description">Description</Label>
+            <Textarea
+              id="issue-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+            />
+          </div>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Description
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
-
-        <div className="grid grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Type
-            <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-md border border-slate-300 px-2 py-2 text-sm">
-              <option value="EPIC">Epic</option>
-              <option value="STORY">Story</option>
-              <option value="TASK">Task</option>
-              <option value="BUG">Bug</option>
-              <option value="SUBTASK">Subtask</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Priority
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className="rounded-md border border-slate-300 px-2 py-2 text-sm">
-              <option value="LOWEST">Lowest</option>
-              <option value="LOW">Low</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HIGH">High</option>
-              <option value="HIGHEST">Highest</option>
-            </select>
-          </label>
-        </div>
-
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Assignee
-          <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className="rounded-md border border-slate-300 px-2 py-2 text-sm">
-            <option value="">Unassigned</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {labels.length > 0 && (
-          <div className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Labels
-            <div className="flex flex-wrap gap-2">
-              {labels.map((label) => {
-                const checked = labelIds.includes(label.id);
-                return (
-                  <button
-                    type="button"
-                    key={label.id}
-                    onClick={() =>
-                      setLabelIds((prev) =>
-                        checked ? prev.filter((id) => id !== label.id) : [...prev, label.id]
-                      )
-                    }
-                    className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                    style={{ backgroundColor: label.color, opacity: checked ? 1 : 0.4 }}
-                  >
-                    {label.name}
-                  </button>
-                );
-              })}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label>Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EPIC">Epic</SelectItem>
+                  <SelectItem value="STORY">Story</SelectItem>
+                  <SelectItem value="TASK">Task</SelectItem>
+                  <SelectItem value="BUG">Bug</SelectItem>
+                  <SelectItem value="SUBTASK">Subtask</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Priority</Label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOWEST">Lowest</SelectItem>
+                  <SelectItem value="LOW">Low</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HIGH">High</SelectItem>
+                  <SelectItem value="HIGHEST">Highest</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex flex-col gap-1.5">
+            <Label>Assignee</Label>
+            <Select value={assigneeId || UNASSIGNED} onValueChange={(v) => setAssigneeId(v === UNASSIGNED ? '' : v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm font-medium text-slate-600">
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-          >
-            {submitting ? 'Creating...' : 'Create issue'}
-          </button>
-        </div>
-      </form>
-    </Modal>
+          {labels.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <Label>Labels</Label>
+              <div className="flex flex-wrap gap-2">
+                {labels.map((label) => {
+                  const checked = labelIds.includes(label.id);
+                  return (
+                    <button
+                      type="button"
+                      key={label.id}
+                      onClick={() =>
+                        setLabelIds((prev) =>
+                          checked ? prev.filter((id) => id !== label.id) : [...prev, label.id]
+                        )
+                      }
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-xs font-medium text-white transition-opacity',
+                        checked ? 'opacity-100' : 'opacity-40 hover:opacity-70'
+                      )}
+                      style={{ backgroundColor: label.color }}
+                    >
+                      {label.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? 'Creating...' : 'Create issue'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

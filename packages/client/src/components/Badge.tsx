@@ -1,29 +1,25 @@
 import { IssuePriority, IssueType } from '../api/types';
+import { Badge } from './ui/badge';
 
 export function LabelChip({ name, color }: { name: string; color: string }) {
   return (
-    <span
-      className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-      style={{ backgroundColor: color }}
-    >
+    <Badge className="border-transparent text-white hover:opacity-90" style={{ backgroundColor: color }}>
       {name}
-    </span>
+    </Badge>
   );
 }
 
 const TYPE_STYLES: Record<IssueType, { label: string; className: string }> = {
-  EPIC: { label: 'Epic', className: 'bg-purple-100 text-purple-700' },
-  STORY: { label: 'Story', className: 'bg-emerald-100 text-emerald-700' },
-  TASK: { label: 'Task', className: 'bg-blue-100 text-blue-700' },
-  BUG: { label: 'Bug', className: 'bg-red-100 text-red-700' },
-  SUBTASK: { label: 'Subtask', className: 'bg-slate-200 text-slate-700' },
+  EPIC: { label: 'Epic', className: 'border-transparent bg-purple-100 text-purple-700 hover:bg-purple-100' },
+  STORY: { label: 'Story', className: 'border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100' },
+  TASK: { label: 'Task', className: 'border-transparent bg-blue-100 text-blue-700 hover:bg-blue-100' },
+  BUG: { label: 'Bug', className: 'border-transparent bg-red-100 text-red-700 hover:bg-red-100' },
+  SUBTASK: { label: 'Subtask', className: 'border-transparent bg-slate-200 text-slate-700 hover:bg-slate-200' },
 };
 
 export function IssueTypeBadge({ type }: { type: IssueType }) {
   const style = TYPE_STYLES[type];
-  return (
-    <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${style.className}`}>{style.label}</span>
-  );
+  return <Badge className={style.className}>{style.label}</Badge>;
 }
 
 const PRIORITY_STYLES: Record<IssuePriority, { label: string; className: string }> = {

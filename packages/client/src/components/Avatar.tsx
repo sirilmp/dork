@@ -1,4 +1,6 @@
 import { UserSummary } from '../api/types';
+import { Avatar as AvatarRoot, AvatarFallback, AvatarImage } from './ui/avatar';
+import { cn } from '../lib/utils';
 
 function initials(name: string): string {
   return name
@@ -13,7 +15,7 @@ export function Avatar({ user, size = 28 }: { user: UserSummary | null; size?: n
   if (!user) {
     return (
       <div
-        className="flex items-center justify-center rounded-full bg-slate-200 text-xs font-medium text-slate-500"
+        className="flex shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
         style={{ width: size, height: size }}
         title="Unassigned"
       >
@@ -22,25 +24,12 @@ export function Avatar({ user, size = 28 }: { user: UserSummary | null; size?: n
     );
   }
 
-  if (user.avatarUrl) {
-    return (
-      <img
-        src={user.avatarUrl}
-        alt={user.name}
-        title={user.name}
-        className="rounded-full object-cover"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-
   return (
-    <div
-      className="flex items-center justify-center rounded-full bg-accent text-xs font-medium text-accent-foreground"
-      style={{ width: size, height: size }}
-      title={user.name}
-    >
-      {initials(user.name)}
-    </div>
+    <AvatarRoot style={{ width: size, height: size }} className={cn('shrink-0')} title={user.name}>
+      {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+      <AvatarFallback className="text-xs font-medium" style={{ fontSize: Math.max(10, size * 0.4) }}>
+        {initials(user.name)}
+      </AvatarFallback>
+    </AvatarRoot>
   );
 }

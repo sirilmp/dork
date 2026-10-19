@@ -22,10 +22,10 @@ export function BoardColumn({
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-lg bg-slate-100 p-2">
+    <div className="flex w-72 shrink-0 flex-col rounded-lg bg-muted/60 p-2">
       <div className="mb-2 flex items-center justify-between px-1">
-        <h3 className="text-sm font-semibold text-slate-600">{COLUMN_TITLES[status]}</h3>
-        <span className="rounded-full bg-slate-200 px-2 text-xs text-slate-500">{issues.length}</span>
+        <h3 className="text-sm font-semibold text-muted-foreground">{COLUMN_TITLES[status]}</h3>
+        <span className="rounded-full bg-muted px-2 text-xs text-muted-foreground">{issues.length}</span>
       </div>
       <div
         ref={setNodeRef}

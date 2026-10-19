@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { IssuePriority, IssueStatus, IssueType, NotificationType, ProjectRole } from '@prisma/client';
+import { IssuePriority, IssueType, NotificationType, ProjectRole } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { requireProjectRole } from '../../middleware/projectAccess';
 import { asyncHandler, HttpError } from '../../middleware/errorHandler';
 import { issueInclude, logActivity, nextIssueNumber, serializeIssue } from './issues.service';
 import { notifyUser } from '../notifications/notifications.service';
+import { assertStatusInProject, assertTransitionAllowed, getDefaultStatus } from '../workflow/workflow.service';
 
 // Mounted at /api/projects/:projectId/issues
 export const projectIssuesRouter = Router({ mergeParams: true });
@@ -17,14 +18,14 @@ projectIssuesRouter.get(
   '/',
   requireProjectRole(ProjectRole.VIEWER),
   asyncHandler(async (req, res) => {
-    const { assigneeId, labelId, type, search, status } = req.query;
+    const { assigneeId, labelId, type, search, statusId } = req.query;
 
     const issues = await prisma.issue.findMany({
       where: {
         projectId: req.params.projectId,
         assigneeId: typeof assigneeId === 'string' ? assigneeId : undefined,
         type: typeof type === 'string' ? (type as IssueType) : undefined,
-        status: typeof status === 'string' ? (status as IssueStatus) : undefined,
+        statusId: typeof statusId === 'string' ? statusId : undefined,
         labels: typeof labelId === 'string' ? { some: { labelId } } : undefined,
         title: typeof search === 'string' && search.length > 0 ? { contains: search, mode: 'insensitive' } : undefined,
       },
@@ -41,7 +42,8 @@ const createIssueSchema = z.object({
   description: z.string().max(20000).optional(),
   type: z.nativeEnum(IssueType).default(IssueType.TASK),
   priority: z.nativeEnum(IssuePriority).default(IssuePriority.MEDIUM),
-  status: z.nativeEnum(IssueStatus).default(IssueStatus.TODO),
+  // Optional: defaults to the project's configured default workflow status.
+  statusId: z.string().uuid().optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   parentId: z.string().uuid().nullable().optional(),
   storyPoints: z.number().int().min(0).max(100).nullable().optional(),
@@ -53,18 +55,22 @@ projectIssuesRouter.post(
   '/',
   requireProjectRole(ProjectRole.MEMBER),
   asyncHandler(async (req, res) => {
+    const projectId = req.params.projectId;
     const input = createIssueSchema.parse(req.body);
-    const number = await nextIssueNumber(req.params.projectId);
+    const statusId = input.statusId
+      ? (await assertStatusInProject(projectId, input.statusId)).id
+      : (await getDefaultStatus(projectId)).id;
+    const number = await nextIssueNumber(projectId);
 
     const issue = await prisma.issue.create({
       data: {
-        projectId: req.params.projectId,
+        projectId,
         number,
         title: input.title,
         description: input.description,
         type: input.type,
         priority: input.priority,
-        status: input.status,
+        statusId,
         assigneeId: input.assigneeId ?? undefined,
         parentId: input.parentId ?? undefined,
         storyPoints: input.storyPoints ?? undefined,
@@ -155,7 +161,7 @@ const updateIssueSchema = z.object({
   description: z.string().max(20000).nullable().optional(),
   type: z.nativeEnum(IssueType).optional(),
   priority: z.nativeEnum(IssuePriority).optional(),
-  status: z.nativeEnum(IssueStatus).optional(),
+  statusId: z.string().uuid().optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   parentId: z.string().uuid().nullable().optional(),
   storyPoints: z.number().int().min(0).max(100).nullable().optional(),
@@ -171,6 +177,12 @@ issuesRouter.patch(
     await requireProjectRole(ProjectRole.MEMBER)(req, res, async () => {
       const input = updateIssueSchema.parse(req.body);
       const actorId = req.user!.sub;
+
+      let newStatus = existing.status;
+      if (input.statusId && input.statusId !== existing.statusId) {
+        newStatus = await assertStatusInProject(existing.projectId, input.statusId);
+        await assertTransitionAllowed(existing.projectId, existing.statusId, newStatus.id);
+      }
 
       const updated = await prisma.$transaction(async (tx) => {
         if (input.labelIds) {
@@ -189,7 +201,7 @@ issuesRouter.patch(
             description: input.description,
             type: input.type,
             priority: input.priority,
-            status: input.status,
+            statusId: input.statusId,
             assigneeId: input.assigneeId,
             parentId: input.parentId,
             storyPoints: input.storyPoints,
@@ -198,7 +210,9 @@ issuesRouter.patch(
           include: issueInclude,
         });
 
-        await logActivity(existing.id, actorId, 'status', existing.status, input.status ?? existing.status);
+        // Status changes are logged by human-readable name (for the activity
+        // feed), not id, since names are what a reader recognizes.
+        await logActivity(existing.id, actorId, 'status', existing.status.name, newStatus.name);
         await logActivity(
           existing.id,
           actorId,
@@ -225,11 +239,11 @@ issuesRouter.patch(
         });
       }
 
-      if (input.status && input.status !== existing.status && updated.assigneeId) {
+      if (input.statusId && input.statusId !== existing.statusId && updated.assigneeId) {
         await notifyUser({
           userId: updated.assigneeId,
           type: NotificationType.ISSUE_STATUS_CHANGED,
-          payload: { issueId: updated.id, title: updated.title, status: input.status },
+          payload: { issueId: updated.id, title: updated.title, status: updated.status.name },
         });
       }
 

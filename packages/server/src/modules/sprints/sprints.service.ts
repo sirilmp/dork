@@ -46,9 +46,16 @@ export interface BurndownPoint {
  * newValue is this sprint's id, falling back to the issue's createdAt (clamped to the
  * sprint's startDate, since planning typically front-loads issues before day 1).
  *
- * Per-issue "done" time: the most recent `status` activity log entry whose newValue is
- * DONE, as long as no later entry moved it back out of DONE. An issue created already in
- * DONE status (no activity log) falls back to its createdAt.
+ * Per-issue "done" time: the most recent `status` activity log entry whose newValue names
+ * a DONE-category status, as long as no later entry moved it to a non-DONE status. An
+ * issue created already in a DONE-category status (no activity log) falls back to its
+ * createdAt. "Done-ness" is always decided by the target status's `category`, never its
+ * name, since a project's statuses (and their names) are admin-configurable — see the
+ * workflow module. The activity log stores status *names* (for a readable activity feed),
+ * so a name -> category lookup is built from the project's *current* workflow statuses;
+ * an issue whose logged status name was later renamed on the project will fall back to
+ * being treated as not-done for that historical entry, which is an accepted limitation of
+ * not storing a point-in-time category snapshot per log entry.
  *
  * A null storyPoints is treated as 0 (not excluded), since the burndown represents a sum
  * of committed, estimated points and an un-estimated issue contributes nothing to it.
@@ -59,16 +66,20 @@ export async function computeBurndown(sprintId: string): Promise<BurndownPoint[]
 
   const issues = await prisma.issue.findMany({
     where: { sprintId },
-    select: { id: true, storyPoints: true, status: true, createdAt: true },
+    select: { id: true, storyPoints: true, createdAt: true, status: { select: { category: true } } },
   });
   const issueIds = issues.map((i) => i.id);
 
-  const activity = issueIds.length
-    ? await prisma.activityLog.findMany({
-        where: { issueId: { in: issueIds }, field: { in: ['sprint', 'status'] } },
-        orderBy: { createdAt: 'asc' },
-      })
-    : [];
+  const [activity, statuses] = await Promise.all([
+    issueIds.length
+      ? prisma.activityLog.findMany({
+          where: { issueId: { in: issueIds }, field: { in: ['sprint', 'status'] } },
+          orderBy: { createdAt: 'asc' },
+        })
+      : Promise.resolve([]),
+    prisma.workflowStatus.findMany({ where: { projectId: sprint.projectId }, select: { name: true, category: true } }),
+  ]);
+  const categoryByName = new Map(statuses.map((s) => [s.name, s.category]));
 
   const addedAt = new Map<string, Date>();
   const doneAt = new Map<string, Date>();
@@ -76,7 +87,7 @@ export async function computeBurndown(sprintId: string): Promise<BurndownPoint[]
   for (const issue of issues) {
     const fallback = issue.createdAt < sprint.startDate ? sprint.startDate : issue.createdAt;
     addedAt.set(issue.id, fallback);
-    if (issue.status === 'DONE') doneAt.set(issue.id, issue.createdAt);
+    if (issue.status.category === 'DONE') doneAt.set(issue.id, issue.createdAt);
   }
 
   for (const log of activity) {
@@ -85,7 +96,8 @@ export async function computeBurndown(sprintId: string): Promise<BurndownPoint[]
       addedAt.set(log.issueId, clamped);
     }
     if (log.field === 'status') {
-      if (log.newValue === 'DONE') doneAt.set(log.issueId, log.createdAt);
+      const category = log.newValue ? categoryByName.get(log.newValue) : undefined;
+      if (category === 'DONE') doneAt.set(log.issueId, log.createdAt);
       else doneAt.delete(log.issueId);
     }
   }

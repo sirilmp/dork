@@ -175,8 +175,10 @@ sprintsRouter.post(
         destinationSprintId = destination.id;
       }
 
+      // "Incomplete" is decided by status *category*, never a status name,
+      // since a project's statuses are admin-configurable.
       const incomplete = await prisma.issue.findMany({
-        where: { sprintId: sprint.id, status: { not: 'DONE' } },
+        where: { sprintId: sprint.id, status: { category: { not: 'DONE' } } },
         select: { id: true },
       });
 

@@ -1,6 +1,14 @@
 import 'dotenv/config';
-import { PrismaClient, IssuePriority, IssueStatus, IssueType, ProjectRole, SystemRole } from '@prisma/client';
+import { PrismaClient, IssuePriority, IssueType, ProjectRole, StatusCategory, SystemRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+
+/** The four default statuses every new project gets, matching the pre-workflow enum. */
+const DEFAULT_STATUSES: Array<{ name: string; category: StatusCategory; isDefault: boolean }> = [
+  { name: 'To Do', category: StatusCategory.TODO, isDefault: true },
+  { name: 'In Progress', category: StatusCategory.IN_PROGRESS, isDefault: false },
+  { name: 'In Review', category: StatusCategory.IN_PROGRESS, isDefault: false },
+  { name: 'Done', category: StatusCategory.DONE, isDefault: false },
+];
 
 const prisma = new PrismaClient();
 
@@ -56,54 +64,64 @@ async function main() {
     }));
   console.log(`[seed] Sample project ready: ${project.key}`);
 
+  let statuses = await prisma.workflowStatus.findMany({ where: { projectId: project.id }, orderBy: { order: 'asc' } });
+  if (statuses.length === 0) {
+    await prisma.workflowStatus.createMany({
+      data: DEFAULT_STATUSES.map((s, order) => ({ projectId: project.id, order, ...s })),
+    });
+    statuses = await prisma.workflowStatus.findMany({ where: { projectId: project.id }, orderBy: { order: 'asc' } });
+    console.log(`[seed] Created ${statuses.length} default workflow statuses for ${project.key}.`);
+  }
+  const statusByName = new Map(statuses.map((s) => [s.name, s.id]));
+
   const issueCount = await prisma.issue.count({ where: { projectId: project.id } });
   if (issueCount === 0) {
     const sampleIssues: Array<{
       title: string;
       type: IssueType;
-      status: IssueStatus;
+      statusName: string;
       priority: IssuePriority;
       description: string;
     }> = [
       {
         title: 'Set up project repository',
         type: IssueType.TASK,
-        status: IssueStatus.DONE,
+        statusName: 'Done',
         priority: IssuePriority.HIGH,
         description: 'Initialize the repo, CI, and base tooling.',
       },
       {
         title: 'Design database schema',
         type: IssueType.STORY,
-        status: IssueStatus.DONE,
+        statusName: 'Done',
         priority: IssuePriority.HIGH,
         description: 'Model users, projects, and issues.',
       },
       {
         title: 'Build Kanban board UI',
         type: IssueType.STORY,
-        status: IssueStatus.IN_PROGRESS,
+        statusName: 'In Progress',
         priority: IssuePriority.MEDIUM,
         description: 'Drag-and-drop columns for each status.',
       },
       {
         title: 'Fix avatar upload bug',
         type: IssueType.BUG,
-        status: IssueStatus.IN_REVIEW,
+        statusName: 'In Review',
         priority: IssuePriority.HIGHEST,
         description: 'Avatar upload fails for files over 2MB.',
       },
       {
         title: 'Write onboarding docs',
         type: IssueType.TASK,
-        status: IssueStatus.TODO,
+        statusName: 'To Do',
         priority: IssuePriority.LOW,
         description: 'Document the self-hosting setup steps.',
       },
       {
         title: 'Plan Q1 roadmap',
         type: IssueType.EPIC,
-        status: IssueStatus.TODO,
+        statusName: 'To Do',
         priority: IssuePriority.MEDIUM,
         description: 'Group upcoming stories into an epic for planning.',
       },
@@ -125,7 +143,7 @@ async function main() {
           title: data.title,
           description: data.description,
           type: data.type,
-          status: data.status,
+          statusId: statusByName.get(data.statusName)!,
           priority: data.priority,
           reporterId: admin.id,
           assigneeId: admin.id,

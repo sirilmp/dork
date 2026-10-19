@@ -34,6 +34,9 @@ export const issueInclude = {
   reporter: { select: { id: true, name: true, avatarUrl: true, email: true } },
   labels: { include: { label: true } },
   project: { select: { id: true, key: true, name: true } },
+  // Full workflow status (not just the id) so board/backlog/etc. can render
+  // name/category/color without a second round-trip.
+  status: { select: { id: true, name: true, category: true, color: true, order: true } },
   _count: { select: { comments: true, children: true } },
 } as const;
 

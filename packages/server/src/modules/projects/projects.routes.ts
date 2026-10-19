@@ -1,10 +1,18 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { ProjectRole } from '@prisma/client';
+import { ProjectRole, StatusCategory } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { requireProjectRole } from '../../middleware/projectAccess';
 import { asyncHandler, HttpError } from '../../middleware/errorHandler';
+
+/** Every new project starts with these four statuses, matching the app's pre-workflow defaults. */
+const DEFAULT_WORKFLOW_STATUSES: Array<{ name: string; category: StatusCategory; isDefault: boolean }> = [
+  { name: 'To Do', category: StatusCategory.TODO, isDefault: true },
+  { name: 'In Progress', category: StatusCategory.IN_PROGRESS, isDefault: false },
+  { name: 'In Review', category: StatusCategory.IN_PROGRESS, isDefault: false },
+  { name: 'Done', category: StatusCategory.DONE, isDefault: false },
+];
 
 export const projectsRouter = Router();
 
@@ -64,15 +72,21 @@ projectsRouter.post(
     const existingKey = await prisma.project.findUnique({ where: { key } });
     if (existingKey) throw new HttpError(409, `Project key "${key}" is already in use`);
 
-    const project = await prisma.project.create({
-      data: {
-        name: input.name,
-        description: input.description,
-        key,
-        leadId: req.user!.sub,
-        members: { create: { userId: req.user!.sub, role: ProjectRole.ADMIN } },
-      },
-      include: { lead: { select: { id: true, name: true, avatarUrl: true } } },
+    const project = await prisma.$transaction(async (tx) => {
+      const created = await tx.project.create({
+        data: {
+          name: input.name,
+          description: input.description,
+          key,
+          leadId: req.user!.sub,
+          members: { create: { userId: req.user!.sub, role: ProjectRole.ADMIN } },
+        },
+        include: { lead: { select: { id: true, name: true, avatarUrl: true } } },
+      });
+      await tx.workflowStatus.createMany({
+        data: DEFAULT_WORKFLOW_STATUSES.map((s, order) => ({ projectId: created.id, order, ...s })),
+      });
+      return created;
     });
 
     res.status(201).json(project);

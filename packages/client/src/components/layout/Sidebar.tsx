@@ -6,6 +6,7 @@ import {
   Clock,
   FolderKanban,
   LayoutGrid,
+  ListFilter,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -342,6 +343,7 @@ export function Sidebar({
 
         <div className="my-2 border-t border-border" />
 
+        <NavRow to="/filters" icon={<ListFilter />} label="Filters" collapsed={collapsed} />
         <NavRow to="/teams" icon={<Users />} label="Teams" collapsed={collapsed} />
 
         {user?.role === 'ADMIN' && (

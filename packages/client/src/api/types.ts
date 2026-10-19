@@ -276,6 +276,23 @@ export interface Branding {
   accentColor: string;
 }
 
+export interface SavedFilter {
+  id: string;
+  name: string;
+  query: string;
+  ownerId: string;
+  projectId: string | null;
+  isShared: boolean;
+  createdAt: string;
+  updatedAt: string;
+  owner: { id: string; name: string; email: string; avatarUrl: string | null };
+}
+
+export interface QueryResult {
+  issues: Issue[];
+  orderBy: { field: string; dir: 'ASC' | 'DESC' } | null;
+}
+
 export interface SmtpSettings {
   host: string;
   port: number;

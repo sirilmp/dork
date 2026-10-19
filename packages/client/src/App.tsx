@@ -14,6 +14,7 @@ import { ProjectListPage } from './pages/ProjectListPage';
 import { ProjectCalendarPage } from './pages/ProjectCalendarPage';
 import { ProjectSettingsPage } from './pages/ProjectSettingsPage';
 import { TeamsPage } from './pages/TeamsPage';
+import { FiltersPage } from './pages/FiltersPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 
 export default function App() {
@@ -111,6 +112,16 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <TeamsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/filters"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <FiltersPage />
             </Layout>
           </ProtectedRoute>
         }

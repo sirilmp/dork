@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { issuesApi } from '../api/issues';
 import { projectsApi } from '../api/projects';
+import { filtersApi } from '../api/filters';
+import { ApiError } from '../api/client';
 import { Issue, Label, Project, ProjectMember, WorkflowStatus } from '../api/types';
 import { IssueTypeBadge, LabelChip, PriorityBadge } from '../components/Badge';
 import { Avatar } from '../components/Avatar';
 import { ProjectViewTabs } from '../components/ProjectViewTabs';
 import { StarButton } from '../components/StarButton';
+import { QueryBar } from '../components/QueryBar';
+import { SaveFilterDialog } from '../components/SaveFilterDialog';
 import { IssueDetailModal } from './IssueDetailModal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
@@ -72,13 +76,25 @@ function SortHeader({
 
 export function ProjectListPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams] = useSearchParams();
   const [project, setProject] = useState<Project & { members: ProjectMember[]; labels: Label[] }>();
-  const [issues, setIssues] = useState<Issue[]>([]);
+  const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [openIssueId, setOpenIssueId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'key', dir: 'asc' });
   const { recordView } = useRecentlyViewed();
+
+  // Query-language power-user mode: when a query has been successfully run,
+  // its results replace the plain project issue list until cleared.
+  const [queryText, setQueryText] = useState('');
+  const [queryResult, setQueryResult] = useState<Issue[] | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
+  const [queryRunning, setQueryRunning] = useState(false);
+  const [lastRunQuery, setLastRunQuery] = useState<string | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+
+  const issues = queryResult ?? allIssues;
 
   async function load() {
     if (!projectId) return;
@@ -89,7 +105,7 @@ export function ProjectListPage() {
       issuesApi.board(projectId),
     ]);
     setProject(projectResult);
-    setIssues(issuesResult);
+    setAllIssues(issuesResult);
     setStatuses(boardResult.columns.map((c) => c.status));
     setLoading(false);
     recordView({ kind: 'project', id: projectResult.id, label: projectResult.name, meta: projectResult.key, href: `/projects/${projectResult.id}/board` });
@@ -97,6 +113,37 @@ export function ProjectListPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  async function runQuery(text: string) {
+    if (!projectId) return;
+    if (text.trim().length === 0) {
+      setQueryResult(null);
+      setQueryError(null);
+      setLastRunQuery(null);
+      return;
+    }
+    setQueryRunning(true);
+    try {
+      const result = await filtersApi.runProjectQuery(projectId, text);
+      setQueryResult(result.issues);
+      setQueryError(null);
+      setLastRunQuery(text);
+    } catch (err) {
+      setQueryError(err instanceof ApiError ? err.message : 'Failed to run query');
+    } finally {
+      setQueryRunning(false);
+    }
+  }
+
+  // Auto-run a query passed in via ?q= (used by the Filters page's "Run" action).
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q && projectId) {
+      setQueryText(q);
+      runQuery(q);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -123,6 +170,33 @@ export function ProjectListPage() {
         </h1>
         <ProjectViewTabs projectId={project.id} active="list" />
       </div>
+
+      <QueryBar
+        value={queryText}
+        onChange={setQueryText}
+        onRun={() => runQuery(queryText)}
+        error={queryError}
+        running={queryRunning}
+        canSave={lastRunQuery !== null && lastRunQuery === queryText && !queryError}
+        onSaveClick={() => setShowSaveDialog(true)}
+      />
+      {queryResult !== null && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          {queryResult.length} result{queryResult.length === 1 ? '' : 's'} for this query.{' '}
+          <button
+            type="button"
+            className="underline hover:text-foreground"
+            onClick={() => {
+              setQueryText('');
+              setQueryResult(null);
+              setQueryError(null);
+              setLastRunQuery(null);
+            }}
+          >
+            Clear
+          </button>
+        </p>
+      )}
 
       <Table>
         <TableHeader>
@@ -189,6 +263,14 @@ export function ProjectListPage() {
           onChanged={load}
         />
       )}
+
+      <SaveFilterDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        query={lastRunQuery ?? queryText}
+        project={{ id: project.id, key: project.key }}
+        onSaved={() => undefined}
+      />
     </div>
   );
 }

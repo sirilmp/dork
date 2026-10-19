@@ -69,7 +69,7 @@ export async function listVisibleFilters(userId: string, isSystemAdmin: boolean)
         { isShared: true, projectId: { in: memberProjectIds } },
       ],
     },
-    include: { owner: { select: { id: true, name: true, avatarUrl: true } } },
+    include: { owner: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     orderBy: { updatedAt: 'desc' },
   });
 }

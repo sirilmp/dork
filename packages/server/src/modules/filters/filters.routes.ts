@@ -80,7 +80,7 @@ filtersRouter.post(
         isShared: input.isShared ?? false,
         ownerId: req.user!.sub,
       },
-      include: { owner: { select: { id: true, name: true, avatarUrl: true } } },
+      include: { owner: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     });
     res.status(201).json(filter);
   })
@@ -101,7 +101,7 @@ filtersRouter.patch(
     const filter = await prisma.savedFilter.update({
       where: { id: req.params.id },
       data: input,
-      include: { owner: { select: { id: true, name: true, avatarUrl: true } } },
+      include: { owner: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     });
     res.json(filter);
   })

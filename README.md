@@ -18,10 +18,25 @@ configurable branding and SMTP, without touching code.
   assignee, reporter, labels, parent/child relationships, story points, due
   dates, comments, issue links (Blocks / Relates to / Duplicates), and an
   auto-recorded activity log (status/assignee/priority/title changes).
-- **Kanban board**: per-project board with To Do / In Progress / In Review /
-  Done columns, drag-and-drop (via `@dnd-kit`) to reorder within a column or
-  move between columns (optimistic UI + API call, with rollback on failure),
-  and a filter bar (assignee, label, type, free-text search).
+- **Kanban board**: per-project board whose columns come from that project's
+  own configurable workflow (see below), drag-and-drop (via `@dnd-kit`) to
+  reorder within a column or move between columns (optimistic UI + API call,
+  with rollback and a toast explaining why on failure), and a filter bar
+  (assignee, label, type, free-text search).
+- **Customizable workflows**: each project defines its own ordered list of
+  statuses (name, color, and a `category` of `TODO` / `IN_PROGRESS` / `DONE`)
+  instead of a fixed enum — add, rename, recolor, reorder, and set the
+  default status from the project's Settings page (gear icon on the board
+  header; project-admin only). A status with existing issues, or the current
+  default, can't be deleted (409). Burndown charts and "is this sprint
+  issue done" logic key off a status's **category**, never its name, so
+  renaming or adding statuses never breaks those computations. Optional
+  per-project **transition rules** restrict which status-to-status moves are
+  allowed; with zero rules defined (the default for every project, old and
+  new) any status can move to any other, exactly like before — the moment
+  one rule exists, only the defined `(from -> to)` pairs (plus a no-op move
+  to the same status) are allowed, and an invalid board drag is rejected
+  with a 400 and rolls back on the client with an explanatory toast.
 - **Notifications**: in-app notification records created on assignment,
   comment-added, @mention (simple `@username`/`@local-part` regex match
   against project members), and status change. Email sending is fully
@@ -98,7 +113,6 @@ configurable branding and SMTP, without touching code.
 These are explicitly out of scope for this pass, to keep it a genuinely
 working foundation rather than a sprawling half-built app. Clear next steps:
 
-- Custom workflow editor (configurable statuses/transitions per project)
 - JQL-like advanced search / saved filters
 - Public REST API documentation and webhooks for third-party integrations
 - OAuth / SSO (Google, GitHub, SAML, OIDC)

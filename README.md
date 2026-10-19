@@ -156,13 +156,94 @@ configurable branding and SMTP, without touching code.
   disk is the simplest option for a single-container self-host; a deployment
   with multiple server replicas behind a load balancer would need shared or
   networked storage instead (e.g. NFS, S3) — out of scope for this pass.
+- **JQL-like query language & saved filters**: a focused subset of Jira's
+  query language, with its own hand-rolled tokenizer/parser/compiler
+  (`packages/server/src/modules/filters/jql/`, no grammar-library
+  dependency) that compiles straight to a Prisma `where` clause — no raw SQL
+  string concatenation anywhere. A query input lives in the project List
+  view (`Run`/inline error display, Jira-style, right under the field, not a
+  toast), with a "Save filter" action and a dedicated **Filters** sidebar
+  page for re-running, sharing, and deleting saved filters. See
+  [Query language reference](#query-language-reference) below for the exact
+  supported syntax. Like every other filter in this app, the compiler goes
+  through Prisma's typed query builder exclusively — no user input is ever
+  concatenated into a SQL string.
+
+## Query language reference
+
+A deliberately small subset of Jira's JQL — enough to be genuinely useful
+for a self-hosted tracker, not a reimplementation of Jira's full grammar.
+Try it in a project's List view.
+
+**Fields**: `project`, `status`, `statusCategory` (`TODO` / `IN_PROGRESS` /
+`DONE`), `assignee`, `reporter`, `priority` (`Lowest`…`Highest`), `type`
+(`Epic`/`Story`/`Task`/`Bug`/`Subtask`), `label`, `sprint`, `dueDate`,
+`storyPoints`, `text` (free-text search over the issue title and the
+plain-text fallback of its description), and custom fields via **`cf.<name>`**
+— e.g. `cf.Severity` or, when the field's name has a space, `cf."Story Estimate"`.
+This dot-notation syntax was chosen over Jira's numeric `cf[12345]` because
+this app's custom fields are named, per-project, admin-defined fields, not
+fixed numeric ids — `cf.<name>` stays both human-readable and unambiguous
+against the fixed built-in fields above. A `cf.<name>` reference resolves
+against whatever custom field definitions exist, by that name, in the
+query's scope (see below); it isn't tied to any particular field type, so
+the operator you use decides how the stored value is compared.
+
+**Operators**: `=`, `!=`, `IN (a, b, …)`, `NOT IN (a, b, …)`, `IS EMPTY`,
+`IS NOT EMPTY`; and, for dates and numbers (`dueDate`, `storyPoints`, and
+`cf.<name>` custom fields holding numbers/dates), also `>`, `>=`, `<`, `<=`.
+`text` only supports `=` (a case-insensitive "contains" match). Values are
+either `"quoted strings"` or bare words (`status = Done`, `priority = High`)
+— quoting is only required when a value contains a space.
+
+**Boolean logic**: `AND`, `OR`, `NOT`, and parentheses for grouping, with the
+usual precedence (`NOT` binds tightest, then `AND`, then `OR`).
+
+**`currentUser()`**: a special value for `assignee`/`reporter` that resolves
+to whoever is making the request, at query-execution time on the server —
+never treated as a literal username, so a saved filter using it means
+something different for each person who runs it.
+
+**`ORDER BY <field> [ASC|DESC]`**: one field, ascending by default. Orderable
+fields: `project`, `status`, `statusCategory`, `assignee`, `reporter`,
+`priority`, `type`, `dueDate`, `storyPoints`, `createdAt`, `updatedAt`.
+`label`, `sprint`, `text` and custom fields can be filtered on but not
+sorted by.
+
+**Scope — single project vs. cross-project**: `POST /api/projects/:projectId/query`
+runs a query against one project (used by the List view's query bar).
+`POST /api/issues/query` runs the same query language across every project
+the caller belongs to (or every project, for a system ADMIN) — the same
+access scope `GET /api/issues/mine` already uses — so a query like
+`project IN (DEMO, OPS) AND assignee = currentUser()` can span projects the
+way Jira's own cross-project JQL does. A saved filter with no project
+(`projectId: null`) always runs in this cross-project scope.
+
+**What's deliberately left out** (vs. real Jira JQL): functions other than
+`currentUser()` (no `startOfWeek()`, `membersOf()`, etc.), relative/fuzzy
+date values (no `-7d`), multi-field `ORDER BY`, and JQL's `~`/`!~` "text
+contains" operators on arbitrary fields (only the dedicated `text` field
+supports contains-matching). These are reasonable follow-ups, not technical
+dead ends — the parser/compiler split makes extending the grammar isolated
+to `packages/server/src/modules/filters/jql/`.
+
+**Examples**
+
+```
+status = "Done"
+assignee = currentUser() AND priority IN (High, Highest)
+statusCategory != DONE ORDER BY priority DESC
+cf.Severity = "High"
+cf."Story Estimate" > 5
+(status = "In Progress" OR status = "To Do") AND NOT label = blocked
+project IN (DEMO, OPS) AND dueDate <= "2026-12-31"
+```
 
 ## Not yet implemented / Roadmap
 
 These are explicitly out of scope for this pass, to keep it a genuinely
 working foundation rather than a sprawling half-built app. Clear next steps:
 
-- JQL-like advanced search / saved filters
 - Public REST API documentation and webhooks for third-party integrations
 - OAuth / SSO (Google, GitHub, SAML, OIDC)
 - Real-time updates (websockets) — the board currently relies on

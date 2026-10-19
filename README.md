@@ -101,6 +101,28 @@ configurable branding and SMTP, without touching code.
   `ActivityLog` entries) rather than a pre-aggregated snapshot table — simpler
   at the cost of recomputing the series per request, which is cheap at this
   scale. Issues with no story points count as 0 toward the total.
+- **Reports: velocity + cumulative flow diagram** (`/projects/:id/reports`,
+  added to the Board/Backlog/List/Calendar tab bar): two more hand-rolled SVG
+  charts, same on-demand-from-existing-data philosophy as burndown — no
+  snapshot tables, no charting library.
+  - **Velocity** (`GET /api/projects/:id/reports/velocity`): committed vs.
+    completed story points for every COMPLETED sprint, oldest first, plus an
+    average-velocity reference line over the last 5 sprints. "Committed" is
+    every issue ever assigned to the sprint (reconstructed from the `sprint`
+    ActivityLog field, since completing a sprint moves any not-done issue
+    elsewhere — see below); "completed" is the committed set filtered to
+    issues whose DONE-category status was reached at or before the sprint's
+    `completedAt`. The sprint-membership/completion-timeline replay this
+    needs is the same one burndown uses, factored out as
+    `reconstructIssueSprintTimelines` (`sprints.service.ts`) so the two
+    features share one ActivityLog replay instead of two that could drift.
+  - **Cumulative flow diagram** (`GET /api/projects/:id/reports/cfd?from=&to=`,
+    default range: last 30 days, or the project's full history if shorter):
+    for each day, the count of issues in each status *category* (TODO /
+    IN_PROGRESS / DONE, not individual status) as of end-of-day, reconstructed
+    from `Issue.createdAt` plus `ActivityLog` "status" entries. Categories,
+    not statuses, keep the stacked chart legible against a project's
+    admin-configurable workflow.
 - **Navigation**: a persistent, collapsible left sidebar
   (`packages/client/src/components/layout/Sidebar.tsx` + `Layout.tsx`) is the
   app's only chrome on every authenticated page — it replaced the old top
@@ -260,6 +282,10 @@ working foundation rather than a sprawling half-built app. Clear next steps:
 - Real-time updates (websockets) — the board currently relies on
   request/response + optimistic updates, not live push
 - Fine-grained per-field permissions beyond project roles
+- A global cross-project activity feed
+- Custom dashboard widgets — the Reports page above ships two fixed charts
+  (velocity, cumulative flow diagram), not a general configurable
+  widget/dashboard builder; still not built
 
 ## Architecture overview
 

@@ -21,6 +21,7 @@ import { customFieldsRouter } from './modules/custom-fields/custom-fields.routes
 import { attachmentsRouter, issueAttachmentsRouter } from './modules/attachments/attachments.routes';
 import { crossProjectQueryRouter, filtersRouter, projectQueryRouter } from './modules/filters/filters.routes';
 import { workloadRouter } from './modules/workload/workload.routes';
+import { reportsRouter } from './modules/reports/reports.routes';
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/api/projects/:projectId/board', boardsRouter);
 app.use('/api/projects/:projectId/workflow', workflowRouter);
 app.use('/api/projects/:projectId/sprints', projectSprintsRouter);
 app.use('/api/projects/:projectId/backlog', projectBacklogRouter);
+app.use('/api/projects/:projectId/reports', reportsRouter);
 app.use('/api/sprints', sprintsRouter);
 app.use('/api/projects/:projectId/labels', labelsRouter);
 app.use('/api/projects/:projectId/custom-fields', customFieldsRouter);

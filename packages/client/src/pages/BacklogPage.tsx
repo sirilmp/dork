@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import {
@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import { StarButton } from '../components/StarButton';
+import { ProjectViewTabs } from '../components/ProjectViewTabs';
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 const BACKLOG_ID = 'backlog';
@@ -461,12 +462,7 @@ export function BacklogPage() {
             {project.name} <span className="text-muted-foreground">({project.key})</span>
             <StarButton project={project} />
           </h1>
-          <div className="mt-1 flex gap-3 text-sm">
-            <Link to={`/projects/${project.id}/board`} className="text-muted-foreground hover:text-primary">
-              Board
-            </Link>
-            <span className="font-medium text-primary">Backlog</span>
-          </div>
+          <ProjectViewTabs projectId={project.id} active="backlog" />
         </div>
         <Button onClick={() => setShowCreateSprint(true)}>Create sprint</Button>
       </div>

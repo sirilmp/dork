@@ -10,6 +10,8 @@ import { HomePage } from './pages/HomePage';
 import { ProjectsListPage } from './pages/ProjectsListPage';
 import { ProjectBoardPage } from './pages/ProjectBoardPage';
 import { BacklogPage } from './pages/BacklogPage';
+import { ProjectListPage } from './pages/ProjectListPage';
+import { ProjectCalendarPage } from './pages/ProjectCalendarPage';
 import { ProjectSettingsPage } from './pages/ProjectSettingsPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
@@ -69,6 +71,26 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <BacklogPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId/list"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ProjectListPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId/calendar"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ProjectCalendarPage />
             </Layout>
           </ProtectedRoute>
         }

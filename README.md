@@ -61,6 +61,20 @@ configurable branding and SMTP, without touching code.
   `ActivityLog` entries) rather than a pre-aggregated snapshot table — simpler
   at the cost of recomputing the series per request, which is cheap at this
   scale. Issues with no story points count as 0 toward the total.
+- **Navigation**: a persistent, collapsible left sidebar
+  (`packages/client/src/components/layout/Sidebar.tsx` + `Layout.tsx`) is the
+  app's only chrome on every authenticated page — it replaced the old top
+  navbar. Rows: **For you** (new `/` home page — issues assigned to you
+  across all your projects, `GET /api/issues/mine`), **Recent** (last ~8
+  projects/issues you opened — client-side only, via `localStorage` keyed by
+  user id, since it's a per-viewer convenience, not account state), **Starred**
+  (backend-persisted `StarredProject` model + `/api/me/starred` and
+  `/api/projects/:id/star`, so — unlike Recent — it follows your account
+  across devices), **Projects** (mirrors Jira's "Spaces": a Recent sub-list
+  plus an expandable "More projects"), **Teams**, and **Admin Settings**
+  (admins only). Collapses to an icon-only rail (state persisted in
+  `localStorage`) and falls back to a hamburger-triggered overlay on narrow
+  viewports.
 - **Global user & team management** (admin-only, `packages/server/src/modules/admin-users/`):
   org-wide user list with role changes, deactivate/reactivate, and a
   permanent-delete action; global Teams (simple membership, no per-team

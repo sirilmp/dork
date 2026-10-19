@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
@@ -58,17 +58,23 @@ function NavRow({
   collapsed: boolean;
   end?: boolean;
 }) {
+  // isActive is computed from the current location rather than via NavLink's
+  // function-form `className` prop: when this row is wrapped in Radix's
+  // TooltipTrigger asChild (the collapsed rail), Slot's prop-merging stringifies
+  // a function className instead of calling it, so a plain string className is
+  // used here for both the expanded and collapsed cases.
+  const { pathname } = useLocation();
+  const isActive = end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+
   const link = (
     <NavLink
       to={to}
       end={end}
-      className={({ isActive }) =>
-        cn(
-          'flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium text-foreground/80 hover:bg-muted',
-          collapsed && 'justify-center px-0 py-2',
-          isActive && 'bg-primary/10 text-primary hover:bg-primary/10'
-        )
-      }
+      className={cn(
+        'flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium text-foreground/80 hover:bg-muted',
+        collapsed && 'justify-center px-0 py-2',
+        isActive && 'bg-primary/10 text-primary hover:bg-primary/10'
+      )}
     >
       <span className="flex h-5 w-5 shrink-0 items-center justify-center [&_svg]:h-[18px] [&_svg]:w-[18px]">
         {icon}

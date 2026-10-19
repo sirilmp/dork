@@ -60,11 +60,11 @@ export function HomePage() {
                     <Link key={issue.id} to={`/projects/${issue.projectId}/board`}>
                       <Card className="flex items-center gap-3 p-3 transition-colors hover:border-primary">
                         <IssueTypeBadge type={issue.type} />
-                        <Badge variant="secondary" className="shrink-0">
+                        <Badge variant="secondary" className="hidden shrink-0 sm:inline-flex">
                           {issue.key}
                         </Badge>
                         <span className="min-w-0 flex-1 truncate font-medium text-card-foreground">{issue.title}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">{issue.project.name}</span>
+                        <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">{issue.project.name}</span>
                         <PriorityBadge priority={issue.priority} />
                         <Avatar user={issue.assignee} size={24} />
                       </Card>

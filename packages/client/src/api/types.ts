@@ -301,3 +301,21 @@ export interface SmtpSettings {
   fromAddress: string;
   passwordSet: boolean;
 }
+
+export interface WorkloadProjectBreakdown {
+  projectId: string;
+  key: string;
+  name: string;
+  issueCount: number;
+  storyPoints: number;
+}
+
+export type WorkloadPriorityBreakdown = Record<IssuePriority, number>;
+
+export interface WorkloadEntry {
+  user: UserSummary;
+  issueCount: number;
+  storyPoints: number;
+  byProject: WorkloadProjectBreakdown[];
+  byPriority: WorkloadPriorityBreakdown;
+}

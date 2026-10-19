@@ -15,6 +15,7 @@ import { ProjectCalendarPage } from './pages/ProjectCalendarPage';
 import { ProjectSettingsPage } from './pages/ProjectSettingsPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { FiltersPage } from './pages/FiltersPage';
+import { WorkloadPage } from './pages/WorkloadPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 
 export default function App() {
@@ -122,6 +123,16 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <FiltersPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workload"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <WorkloadPage />
             </Layout>
           </ProtectedRoute>
         }

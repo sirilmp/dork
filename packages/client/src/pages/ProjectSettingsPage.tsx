@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { GripVertical, Plus, Trash2 } from 'lucide-react';
+import { Clipboard, ChevronDown, GripVertical, Plus, Trash2 } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -15,15 +15,32 @@ import { projectsApi } from '../api/projects';
 import { issuesApi } from '../api/issues';
 import { workflowApi } from '../api/workflow';
 import { customFieldsApi } from '../api/custom-fields';
+import { webhooksApi } from '../api/webhooks';
 import { ApiError } from '../api/client';
-import { CustomFieldDefinition, CustomFieldType, Project, StatusCategory, WorkflowStatus } from '../api/types';
+import {
+  CustomFieldDefinition,
+  CustomFieldType,
+  Project,
+  StatusCategory,
+  Webhook,
+  WebhookCreateResult,
+  WebhookDelivery,
+  WebhookEventType,
+  WebhookTestResult,
+  WorkflowStatus,
+  WEBHOOK_EVENT_TYPES,
+} from '../api/types';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
+import { Checkbox } from '../components/ui/checkbox';
+import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip';
 import { cn } from '../lib/utils';
 
@@ -199,6 +216,302 @@ function StatusRow({
         </Tooltip>
       </div>
     </div>
+  );
+}
+
+const WEBHOOK_EVENT_LABEL: Record<WebhookEventType, string> = {
+  'issue.created': 'Issue created',
+  'issue.updated': 'Issue updated',
+  'issue.statusChanged': 'Issue status changed',
+  'comment.created': 'Comment created',
+  'sprint.started': 'Sprint started',
+  'sprint.completed': 'Sprint completed',
+};
+
+function DeliveryList({ projectId, webhookId }: { projectId: string; webhookId: string }) {
+  const [deliveries, setDeliveries] = useState<WebhookDelivery[] | null>(null);
+  const [open, setOpen] = useState(false);
+
+  async function load() {
+    try {
+      setDeliveries(await webhooksApi.deliveries(projectId, webhookId));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to load delivery log');
+    }
+  }
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next && !deliveries) load();
+      }}
+    >
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+          Recent deliveries
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-border bg-muted/30 p-2">
+          {deliveries === null && <p className="text-xs text-muted-foreground">Loading...</p>}
+          {deliveries?.length === 0 && <p className="text-xs text-muted-foreground">No deliveries yet.</p>}
+          {deliveries?.map((d) => (
+            <div key={d.id} className="flex items-center gap-2 text-xs">
+              <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', d.succeeded ? 'bg-emerald-500' : 'bg-red-500')} />
+              <span className="font-medium text-foreground">{d.event}</span>
+              <span className="text-muted-foreground">{d.responseStatus ?? 'no response'}</span>
+              <span className="ml-auto text-muted-foreground">{new Date(d.createdAt).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function WebhookRow({
+  webhook,
+  projectId,
+  onChanged,
+  onDelete,
+}: {
+  webhook: Webhook;
+  projectId: string;
+  onChanged: () => void;
+  onDelete: () => void;
+}) {
+  const [testing, setTesting] = useState(false);
+
+  async function handleToggleActive(isActive: boolean) {
+    try {
+      await webhooksApi.update(projectId, webhook.id, { isActive });
+      onChanged();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to update webhook');
+    }
+  }
+
+  async function handleTest() {
+    setTesting(true);
+    try {
+      const result: WebhookTestResult = await webhooksApi.test(projectId, webhook.id);
+      if (result.succeeded) {
+        toast.success(`Test event delivered (HTTP ${result.responseStatus}).`);
+      } else {
+        toast.error(`Test event failed after ${result.attempts} attempt(s) (HTTP ${result.responseStatus ?? 'no response'}).`);
+      }
+      onChanged();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to send test event');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-3">
+      <div className="flex items-center gap-3">
+        <Switch checked={webhook.isActive} onCheckedChange={handleToggleActive} />
+        <span className="truncate font-mono text-sm text-foreground">{webhook.url}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleTest} disabled={testing}>
+            {testing ? 'Sending...' : 'Send test event'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDelete}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {webhook.events.map((e) => (
+          <Badge key={e} variant="secondary" className="text-xs">
+            {WEBHOOK_EVENT_LABEL[e] ?? e}
+          </Badge>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span>Secret: {webhook.secretMasked}</span>
+        <span>
+          Last triggered: {webhook.lastTriggeredAt ? new Date(webhook.lastTriggeredAt).toLocaleString() : 'never'}
+        </span>
+        {webhook.lastResponseStatus != null && (
+          <span className="flex items-center gap-1">
+            <span
+              className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                webhook.lastResponseStatus >= 200 && webhook.lastResponseStatus < 300 ? 'bg-emerald-500' : 'bg-red-500'
+              )}
+            />
+            HTTP {webhook.lastResponseStatus}
+          </span>
+        )}
+      </div>
+      <DeliveryList projectId={projectId} webhookId={webhook.id} />
+    </div>
+  );
+}
+
+function WebhooksCard({ projectId }: { projectId: string }) {
+  const [webhooks, setWebhooks] = useState<Webhook[] | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newUrl, setNewUrl] = useState('');
+  const [newEvents, setNewEvents] = useState<Set<WebhookEventType>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+  const [createdSecret, setCreatedSecret] = useState<WebhookCreateResult | null>(null);
+
+  async function load() {
+    try {
+      setWebhooks(await webhooksApi.list(projectId));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to load webhooks');
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  async function handleCreate() {
+    if (!newUrl.trim() || newEvents.size === 0) {
+      toast.error('A URL and at least one event are required.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await webhooksApi.create(projectId, { url: newUrl.trim(), events: Array.from(newEvents) });
+      setCreatedSecret(result);
+      setNewUrl('');
+      setNewEvents(new Set());
+      setShowCreate(false);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to create webhook');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm('Delete this webhook? Its delivery log will also be deleted.')) return;
+    try {
+      await webhooksApi.remove(projectId, id);
+      await load();
+      toast.success('Webhook deleted.');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to delete webhook');
+    }
+  }
+
+  function copySecret() {
+    if (!createdSecret) return;
+    navigator.clipboard
+      ?.writeText(createdSecret.secret)
+      .then(() => toast.success('Secret copied.'))
+      .catch(() => toast.error('Could not copy secret.'));
+  }
+
+  function toggleEvent(e: WebhookEventType) {
+    setNewEvents((prev) => {
+      const next = new Set(prev);
+      if (next.has(e)) next.delete(e);
+      else next.add(e);
+      return next;
+    });
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardTitle>Webhooks</CardTitle>
+        <Dialog open={showCreate} onOpenChange={setShowCreate}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4" /> Add webhook
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add webhook</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="webhook-url">Payload URL</Label>
+                <Input
+                  id="webhook-url"
+                  autoFocus
+                  value={newUrl}
+                  onChange={(e) => setNewUrl(e.target.value)}
+                  placeholder="https://example.com/webhooks/jira-clone"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Events</Label>
+                <div className="flex flex-col gap-2">
+                  {WEBHOOK_EVENT_TYPES.map((e) => (
+                    <label key={e} className="flex items-center gap-2 text-sm text-foreground">
+                      <Checkbox checked={newEvents.has(e)} onCheckedChange={() => toggleEvent(e)} />
+                      {WEBHOOK_EVENT_LABEL[e]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreate} disabled={submitting}>
+                {submitting ? 'Creating...' : 'Create'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Sends a signed HTTP POST to the URL below whenever a subscribed event happens in this project. Verify a
+          delivery by recomputing the HMAC-SHA256 of the raw request body using the secret, and comparing it to the{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">X-Webhook-Signature</code> header.
+        </p>
+
+        {createdSecret && (
+          <Alert className="mb-4">
+            <AlertDescription>
+              <p className="mb-2 font-medium text-foreground">
+                Save this secret now — it won&apos;t be shown again.
+              </p>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Webhook for <span className="font-mono">{createdSecret.url}</span> was created. Use this secret to
+                verify the <code className="rounded bg-muted px-1 py-0.5">X-Webhook-Signature</code> header on every
+                delivery.
+              </p>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={createdSecret.secret} className="font-mono text-xs" />
+                <Button type="button" variant="outline" size="icon" onClick={copySecret}>
+                  <Clipboard className="h-4 w-4" />
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex flex-col gap-3">
+          {webhooks?.map((w) => (
+            <WebhookRow key={w.id} webhook={w} projectId={projectId} onChanged={load} onDelete={() => handleDelete(w.id)} />
+          ))}
+          {webhooks && webhooks.length === 0 && <p className="text-sm text-muted-foreground">No webhooks yet.</p>}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -581,6 +894,8 @@ export function ProjectSettingsPage() {
           </DndContext>
         </CardContent>
       </Card>
+
+      <WebhooksCard projectId={project.id} />
 
       <Card>
         <CardHeader>

@@ -351,3 +351,54 @@ export interface WorkloadEntry {
   byProject: WorkloadProjectBreakdown[];
   byPriority: WorkloadPriorityBreakdown;
 }
+
+// The fixed set of events a webhook can subscribe to — keep in sync with
+// the server's modules/webhooks/events.ts.
+export const WEBHOOK_EVENT_TYPES = [
+  'issue.created',
+  'issue.updated',
+  'issue.statusChanged',
+  'comment.created',
+  'sprint.started',
+  'sprint.completed',
+] as const;
+
+export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
+
+export interface Webhook {
+  id: string;
+  projectId: string;
+  url: string;
+  /** Always masked (e.g. "a1b2•••••••c3d4") — the full secret is only ever
+   * present in the response to the create call, as `secret`. */
+  secretMasked: string;
+  events: WebhookEventType[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastTriggeredAt: string | null;
+  lastResponseStatus: number | null;
+}
+
+export interface WebhookCreateResult extends Webhook {
+  /** The raw signing secret — shown once, never returned again. */
+  secret: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  event: string;
+  payload: unknown;
+  responseStatus: number | null;
+  succeeded: boolean;
+  durationMs: number | null;
+  createdAt: string;
+}
+
+export interface WebhookTestResult {
+  succeeded: boolean;
+  responseStatus: number | null;
+  durationMs: number;
+  attempts: number;
+}

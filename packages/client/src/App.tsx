@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { Toaster } from './components/ui/sonner';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './auth/LoginPage';
 import { RegisterPage } from './auth/RegisterPage';
@@ -13,7 +14,7 @@ import { AdminSettingsPage } from './pages/AdminSettingsPage';
 
 function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-muted/30">
       <Navbar />
       {children}
     </div>
@@ -24,10 +25,17 @@ export default function App() {
   const { loading } = useAuth();
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center text-slate-500">Loading...</div>;
+    return (
+      <>
+        <Toaster richColors position="top-right" />
+        <div className="flex h-screen items-center justify-center text-muted-foreground">Loading...</div>
+      </>
+    );
   }
 
   return (
+    <>
+    <Toaster richColors position="top-right" />
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -74,5 +82,6 @@ export default function App() {
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }

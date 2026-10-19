@@ -3,7 +3,38 @@
 @tailwind utilities;
 
 :root {
-  /* Defaults; overridden at runtime by ThemeProvider from /api/branding. */
+  /* Static shadcn/ui tokens (shadcn's default "slate" base theme). These
+     never change at runtime. */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --radius: 0.5rem;
+
+  /* Brand-derived shadcn tokens (HSL triplets, no hsl() wrapper) — set at
+     runtime by ThemeProvider from /api/branding's primaryColor/accentColor,
+     via the hexToHslTriplet bridge in src/theme/ThemeProvider.tsx. The
+     values below are just first-paint defaults matching DEFAULT_BRANDING,
+     so nothing flashes unstyled before the branding fetch resolves. */
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 210 40% 98%;
+  --accent: 262.1 83.3% 57.8%;
+  --accent-foreground: 210 40% 98%;
+  --ring: 217.2 91.2% 59.8%;
+
+  /* Legacy hex copies of the same brand colors, kept for the few spots
+     (e.g. SprintBurndownChart's inline SVG) that need a literal hex/color
+     value rather than a Tailwind utility class. */
   --color-primary: #2563eb;
   --color-primary-foreground: #ffffff;
   --color-accent: #7c3aed;
@@ -11,5 +42,5 @@
 }
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-background text-foreground;
 }

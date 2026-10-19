@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { brandingApi } from '../api/admin';
 import { Branding } from '../api/types';
+import { hexToHslTriplet } from '../lib/color';
 
 const DEFAULT_BRANDING: Branding = {
   productName: 'Open Issue Tracker',
@@ -33,12 +34,43 @@ function contrastingForeground(hex: string): string {
   return luminance > 0.6 ? '#0f172a' : '#ffffff';
 }
 
+// shadcn/ui's foreground tokens, as HSL triplets matching the two hex
+// foregrounds contrastingForeground() can return (near-black / near-white),
+// so --primary-foreground / --accent-foreground stay in the same HSL-triplet
+// format as every other shadcn color token instead of mixing hex and HSL.
+const FOREGROUND_HSL_DARK = '222.2 47.4% 11.2%'; // ~ #0f172a
+const FOREGROUND_HSL_LIGHT = '210 40% 98%'; // ~ #ffffff / near-white
+
 function applyBranding(branding: Branding) {
   const root = document.documentElement;
+
+  // Legacy hex vars — kept for the few spots (inline SVG) that read a
+  // literal color rather than a Tailwind utility class.
   root.style.setProperty('--color-primary', branding.primaryColor);
   root.style.setProperty('--color-primary-foreground', contrastingForeground(branding.primaryColor));
   root.style.setProperty('--color-accent', branding.accentColor);
   root.style.setProperty('--color-accent-foreground', contrastingForeground(branding.accentColor));
+
+  // Bridge to shadcn/ui's expected CSS variables: Tailwind's `primary` /
+  // `accent` / `ring` tokens resolve via `hsl(var(--primary))` etc. (see
+  // tailwind.config.js), so every shadcn component (Button, focus rings,
+  // selected Select/Tabs states, ...) re-themes automatically whenever
+  // admin branding changes, with no per-component changes needed.
+  const primaryHsl = hexToHslTriplet(branding.primaryColor);
+  const accentHsl = hexToHslTriplet(branding.accentColor);
+  root.style.setProperty('--primary', primaryHsl);
+  root.style.setProperty(
+    '--primary-foreground',
+    contrastingForeground(branding.primaryColor) === '#ffffff' ? FOREGROUND_HSL_LIGHT : FOREGROUND_HSL_DARK
+  );
+  root.style.setProperty('--accent', accentHsl);
+  root.style.setProperty(
+    '--accent-foreground',
+    contrastingForeground(branding.accentColor) === '#ffffff' ? FOREGROUND_HSL_LIGHT : FOREGROUND_HSL_DARK
+  );
+  // Focus rings (shadcn's `ring-ring` / default focus-visible styles) follow
+  // the brand's primary color too.
+  root.style.setProperty('--ring', primaryHsl);
 
   document.title = branding.productName;
 

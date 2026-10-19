@@ -17,6 +17,8 @@ import { publicBrandingRouter } from './modules/admin/branding.public.routes';
 import { adminUsersModuleRouter, publicInvitesRouter } from './modules/admin-users/admin-users.routes';
 import { meRouter } from './modules/me/me.routes';
 import { teamsReadRouter } from './modules/teams/teams.routes';
+import { customFieldsRouter } from './modules/custom-fields/custom-fields.routes';
+import { attachmentsRouter, issueAttachmentsRouter } from './modules/attachments/attachments.routes';
 
 const app = express();
 
@@ -36,8 +38,11 @@ app.use('/api/projects/:projectId/sprints', projectSprintsRouter);
 app.use('/api/projects/:projectId/backlog', projectBacklogRouter);
 app.use('/api/sprints', sprintsRouter);
 app.use('/api/projects/:projectId/labels', labelsRouter);
+app.use('/api/projects/:projectId/custom-fields', customFieldsRouter);
 app.use('/api/issues', issuesRouter);
 app.use('/api/issues/:issueId/comments', commentsRouter);
+app.use('/api/issues/:issueId/attachments', issueAttachmentsRouter);
+app.use('/api/attachments', attachmentsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/admin', adminUsersModuleRouter);

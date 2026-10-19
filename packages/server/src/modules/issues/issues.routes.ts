@@ -1,11 +1,18 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { IssuePriority, IssueType, NotificationType, ProjectRole } from '@prisma/client';
+import { IssuePriority, IssueType, NotificationType, Prisma, ProjectRole } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { requireProjectRole } from '../../middleware/projectAccess';
 import { asyncHandler, HttpError } from '../../middleware/errorHandler';
-import { issueInclude, logActivity, nextIssueNumber, serializeIssue } from './issues.service';
+import {
+  applyCustomFieldValues,
+  extractPlainText,
+  issueInclude,
+  logActivity,
+  nextIssueNumber,
+  serializeIssue,
+} from './issues.service';
 import { notifyUser } from '../notifications/notifications.service';
 import { assertStatusInProject, assertTransitionAllowed, getDefaultStatus } from '../workflow/workflow.service';
 
@@ -37,9 +44,17 @@ projectIssuesRouter.get(
   })
 );
 
+const customFieldValueEntrySchema = z.object({
+  fieldDefinitionId: z.string().uuid(),
+  value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+});
+
 const createIssueSchema = z.object({
   title: z.string().min(1).max(300),
   description: z.string().max(20000).optional(),
+  // Tiptap document JSON; `description` (plain text) is derived from it
+  // server-side when present, so clients only need to send this.
+  descriptionJson: z.record(z.any()).nullable().optional(),
   type: z.nativeEnum(IssueType).default(IssueType.TASK),
   priority: z.nativeEnum(IssuePriority).default(IssuePriority.MEDIUM),
   // Optional: defaults to the project's configured default workflow status.
@@ -49,6 +64,7 @@ const createIssueSchema = z.object({
   storyPoints: z.number().int().min(0).max(100).nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   labelIds: z.array(z.string().uuid()).optional(),
+  customFieldValues: z.array(customFieldValueEntrySchema).optional(),
 });
 
 projectIssuesRouter.post(
@@ -62,23 +78,35 @@ projectIssuesRouter.post(
       : (await getDefaultStatus(projectId)).id;
     const number = await nextIssueNumber(projectId);
 
-    const issue = await prisma.issue.create({
-      data: {
-        projectId,
-        number,
-        title: input.title,
-        description: input.description,
-        type: input.type,
-        priority: input.priority,
-        statusId,
-        assigneeId: input.assigneeId ?? undefined,
-        parentId: input.parentId ?? undefined,
-        storyPoints: input.storyPoints ?? undefined,
-        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
-        reporterId: req.user!.sub,
-        labels: input.labelIds ? { create: input.labelIds.map((labelId) => ({ labelId })) } : undefined,
-      },
-      include: issueInclude,
+    const issue = await prisma.$transaction(async (tx) => {
+      const created = await tx.issue.create({
+        data: {
+          projectId,
+          number,
+          title: input.title,
+          description: input.descriptionJson ? extractPlainText(input.descriptionJson) : input.description,
+          descriptionJson: input.descriptionJson ?? undefined,
+          type: input.type,
+          priority: input.priority,
+          statusId,
+          assigneeId: input.assigneeId ?? undefined,
+          parentId: input.parentId ?? undefined,
+          storyPoints: input.storyPoints ?? undefined,
+          dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+          reporterId: req.user!.sub,
+          labels: input.labelIds ? { create: input.labelIds.map((labelId) => ({ labelId })) } : undefined,
+        },
+      });
+
+      if (input.customFieldValues) {
+        try {
+          await applyCustomFieldValues(tx, projectId, created.id, input.customFieldValues, true);
+        } catch (err) {
+          throw new HttpError(400, err instanceof Error ? err.message : 'Invalid custom field value');
+        }
+      }
+
+      return tx.issue.findUniqueOrThrow({ where: { id: created.id }, include: issueInclude });
     });
 
     if (input.assigneeId && input.assigneeId !== req.user!.sub) {
@@ -159,6 +187,7 @@ issuesRouter.get(
 const updateIssueSchema = z.object({
   title: z.string().min(1).max(300).optional(),
   description: z.string().max(20000).nullable().optional(),
+  descriptionJson: z.record(z.any()).nullable().optional(),
   type: z.nativeEnum(IssueType).optional(),
   priority: z.nativeEnum(IssuePriority).optional(),
   statusId: z.string().uuid().optional(),
@@ -167,6 +196,7 @@ const updateIssueSchema = z.object({
   storyPoints: z.number().int().min(0).max(100).nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   labelIds: z.array(z.string().uuid()).optional(),
+  customFieldValues: z.array(customFieldValueEntrySchema).optional(),
 });
 
 issuesRouter.patch(
@@ -194,11 +224,25 @@ issuesRouter.patch(
           }
         }
 
+        if (input.customFieldValues) {
+          try {
+            await applyCustomFieldValues(tx, existing.projectId, existing.id, input.customFieldValues, true);
+          } catch (err) {
+            throw new HttpError(400, err instanceof Error ? err.message : 'Invalid custom field value');
+          }
+        }
+
         const issue = await tx.issue.update({
           where: { id: existing.id },
           data: {
             title: input.title,
-            description: input.description,
+            description: input.descriptionJson ? extractPlainText(input.descriptionJson) : input.description,
+            descriptionJson:
+              input.descriptionJson === null
+                ? Prisma.JsonNull
+                : input.descriptionJson === undefined
+                  ? undefined
+                  : input.descriptionJson,
             type: input.type,
             priority: input.priority,
             statusId: input.statusId,

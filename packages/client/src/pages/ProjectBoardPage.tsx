@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Settings } from 'lucide-react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { issuesApi } from '../api/issues';
 import { projectsApi } from '../api/projects';
-import { BoardColumn as BoardColumnType, Issue, IssueStatus, Label, Project, ProjectMember } from '../api/types';
+import { ApiError } from '../api/client';
+import { BoardColumn as BoardColumnType, Issue, Label, Project, ProjectMember } from '../api/types';
 import { BoardColumn } from '../components/BoardColumn';
 import { FilterBar, BoardFilters } from '../components/FilterBar';
 import { IssueCard } from '../components/IssueCard';
@@ -14,8 +16,6 @@ import { CreateIssueForm } from '../components/CreateIssueForm';
 import { Button } from '../components/ui/button';
 import { StarButton } from '../components/StarButton';
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
-
-const STATUSES: IssueStatus[] = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
 export function ProjectBoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -61,8 +61,8 @@ export function ProjectBoardPage() {
     }));
   }, [columns, filters]);
 
-  function findColumnOfIssue(issueId: string): IssueStatus | undefined {
-    return columns.find((c) => c.issues.some((i) => i.id === issueId))?.status;
+  function findColumnOfIssue(issueId: string): string | undefined {
+    return columns.find((c) => c.issues.some((i) => i.id === issueId))?.status.id;
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -75,46 +75,47 @@ export function ProjectBoardPage() {
     const { active, over } = event;
     if (!over || !projectId) return;
 
-    const sourceStatus = findColumnOfIssue(String(active.id));
-    const overIsColumn = STATUSES.includes(over.id as IssueStatus);
-    const targetStatus = overIsColumn ? (over.id as IssueStatus) : findColumnOfIssue(String(over.id));
-    if (!sourceStatus || !targetStatus) return;
+    const sourceStatusId = findColumnOfIssue(String(active.id));
+    const overIsColumn = columns.some((c) => c.status.id === over.id);
+    const targetStatusId = overIsColumn ? String(over.id) : findColumnOfIssue(String(over.id));
+    if (!sourceStatusId || !targetStatusId) return;
 
     let nextColumns = columns;
 
-    if (sourceStatus === targetStatus && !overIsColumn) {
+    if (sourceStatusId === targetStatusId && !overIsColumn) {
       // Reorder within the same column.
-      const col = columns.find((c) => c.status === sourceStatus)!;
+      const col = columns.find((c) => c.status.id === sourceStatusId)!;
       const oldIndex = col.issues.findIndex((i) => i.id === active.id);
       const newIndex = col.issues.findIndex((i) => i.id === over.id);
       if (oldIndex === newIndex) return;
       const reordered = arrayMove(col.issues, oldIndex, newIndex);
-      nextColumns = columns.map((c) => (c.status === sourceStatus ? { ...c, issues: reordered } : c));
+      nextColumns = columns.map((c) => (c.status.id === sourceStatusId ? { ...c, issues: reordered } : c));
       setColumns(nextColumns);
 
       await issuesApi.reorder(projectId, {
         issueId: String(active.id),
-        toStatus: sourceStatus,
+        toStatusId: sourceStatusId,
         orderedIssueIds: reordered.map((i) => i.id),
       });
       return;
     }
 
     // Move to a different column (optimistic update).
-    const sourceCol = columns.find((c) => c.status === sourceStatus)!;
-    const destCol = columns.find((c) => c.status === targetStatus)!;
+    const sourceCol = columns.find((c) => c.status.id === sourceStatusId)!;
+    const destCol = columns.find((c) => c.status.id === targetStatusId)!;
     const movingIssue = sourceCol.issues.find((i) => i.id === active.id)!;
     const newSourceIssues = sourceCol.issues.filter((i) => i.id !== active.id);
     const insertAt = overIsColumn ? destCol.issues.length : destCol.issues.findIndex((i) => i.id === over.id);
     const newDestIssues = [...destCol.issues];
     newDestIssues.splice(insertAt < 0 ? destCol.issues.length : insertAt, 0, {
       ...movingIssue,
-      status: targetStatus,
+      statusId: destCol.status.id,
+      status: destCol.status,
     });
 
     nextColumns = columns.map((c) => {
-      if (c.status === sourceStatus) return { ...c, issues: newSourceIssues };
-      if (c.status === targetStatus) return { ...c, issues: newDestIssues };
+      if (c.status.id === sourceStatusId) return { ...c, issues: newSourceIssues };
+      if (c.status.id === targetStatusId) return { ...c, issues: newDestIssues };
       return c;
     });
     setColumns(nextColumns);
@@ -122,12 +123,14 @@ export function ProjectBoardPage() {
     try {
       await issuesApi.reorder(projectId, {
         issueId: String(active.id),
-        toStatus: targetStatus,
+        toStatusId: targetStatusId,
         orderedIssueIds: newDestIssues.map((i) => i.id),
       });
-    } catch {
-      // Roll back on failure and let the user know the move didn't stick.
-      toast.error('Failed to move issue. Reverted to the last saved state.');
+    } catch (err) {
+      // Roll back on failure (e.g. the move isn't allowed by this project's
+      // workflow transition rules) and let the user know why it didn't stick.
+      const message = err instanceof ApiError ? err.message : 'Failed to move issue. Reverted to the last saved state.';
+      toast.error(message);
       await load();
     }
   }
@@ -151,7 +154,14 @@ export function ProjectBoardPage() {
             </Link>
           </div>
         </div>
-        <Button onClick={() => setShowCreate(true)}>Create issue</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" asChild title="Project settings">
+            <Link to={`/projects/${project.id}/settings`}>
+              <Settings />
+            </Link>
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>Create issue</Button>
+        </div>
       </div>
 
       <FilterBar
@@ -165,7 +175,7 @@ export function ProjectBoardPage() {
         <div className="flex gap-4 overflow-x-auto pb-4">
           {filteredColumns.map((col) => (
             <BoardColumn
-              key={col.status}
+              key={col.status.id}
               status={col.status}
               issues={col.issues}
               onOpenIssue={(issue) => setOpenIssueId(issue.id)}
@@ -193,6 +203,7 @@ export function ProjectBoardPage() {
           issueId={openIssueId}
           members={project.members.map((m) => m.user)}
           labels={project.labels}
+          statuses={columns.map((c) => c.status)}
           onClose={() => setOpenIssueId(null)}
           onChanged={load}
         />

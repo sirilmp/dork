@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { issuesApi } from '../api/issues';
-import { Issue, IssueStatus } from '../api/types';
+import { Issue, StatusCategory } from '../api/types';
 import { IssueTypeBadge, PriorityBadge } from '../components/Badge';
 import { Avatar } from '../components/Avatar';
 import { Badge } from '../components/ui/badge';
 import { Card } from '../components/ui/card';
 
-const STATUS_ORDER: IssueStatus[] = ['IN_PROGRESS', 'IN_REVIEW', 'TODO', 'DONE'];
-const STATUS_LABEL: Record<IssueStatus, string> = {
+// Grouped by category, not by each project's own (admin-configurable) status
+// names, since "mine" spans projects that may each define different statuses.
+const CATEGORY_ORDER: StatusCategory[] = ['IN_PROGRESS', 'TODO', 'DONE'];
+const CATEGORY_LABEL: Record<StatusCategory, string> = {
   TODO: 'To do',
   IN_PROGRESS: 'In progress',
-  IN_REVIEW: 'In review',
   DONE: 'Done',
 };
 
@@ -28,9 +29,9 @@ export function HomePage() {
   }, []);
 
   const grouped = useMemo(() => {
-    const groups = new Map<IssueStatus, Issue[]>();
-    for (const status of STATUS_ORDER) groups.set(status, []);
-    for (const issue of issues) groups.get(issue.status)?.push(issue);
+    const groups = new Map<StatusCategory, Issue[]>();
+    for (const category of CATEGORY_ORDER) groups.set(category, []);
+    for (const issue of issues) groups.get(issue.status.category)?.push(issue);
     return groups;
   }, [issues]);
 
@@ -47,13 +48,13 @@ export function HomePage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-6">
-          {STATUS_ORDER.map((status) => {
-            const group = grouped.get(status) ?? [];
+          {CATEGORY_ORDER.map((category) => {
+            const group = grouped.get(category) ?? [];
             if (group.length === 0) return null;
             return (
-              <section key={status}>
+              <section key={category}>
                 <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  {STATUS_LABEL[status]} ({group.length})
+                  {CATEGORY_LABEL[category]} ({group.length})
                 </h2>
                 <div className="flex flex-col gap-2">
                   {group.map((issue) => (

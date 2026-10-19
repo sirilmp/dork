@@ -10,6 +10,7 @@ import { HomePage } from './pages/HomePage';
 import { ProjectsListPage } from './pages/ProjectsListPage';
 import { ProjectBoardPage } from './pages/ProjectBoardPage';
 import { BacklogPage } from './pages/BacklogPage';
+import { ProjectSettingsPage } from './pages/ProjectSettingsPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 
@@ -68,6 +69,16 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <BacklogPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId/settings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ProjectSettingsPage />
             </Layout>
           </ProtectedRoute>
         }

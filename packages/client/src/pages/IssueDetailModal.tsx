@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { issuesApi } from '../api/issues';
-import { IssueDetail, Label as LabelType, UserSummary } from '../api/types';
+import { ApiError } from '../api/client';
+import { IssueDetail, Label as LabelType, UserSummary, WorkflowStatus } from '../api/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Avatar } from '../components/Avatar';
 import { Textarea } from '../components/ui/textarea';
@@ -24,12 +25,14 @@ export function IssueDetailModal({
   issueId,
   members,
   labels,
+  statuses,
   onClose,
   onChanged,
 }: {
   issueId: string;
   members: UserSummary[];
   labels: LabelType[];
+  statuses: WorkflowStatus[];
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -69,8 +72,8 @@ export function IssueDetailModal({
       const updated = await issuesApi.update(issue.id, input);
       setIssue((prev) => (prev ? { ...prev, ...updated } : prev));
       onChanged();
-    } catch {
-      toast.error('Failed to save change. Please try again.');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to save change. Please try again.');
     }
   }
 
@@ -209,13 +212,14 @@ export function IssueDetailModal({
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-semibold uppercase text-muted-foreground">Status</Label>
-                  <Select value={issue.status} onValueChange={(v) => updateField({ status: v as any })}>
+                  <Select value={issue.statusId} onValueChange={(v) => updateField({ statusId: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="TODO">To Do</SelectItem>
-                      <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                      <SelectItem value="IN_REVIEW">In Review</SelectItem>
-                      <SelectItem value="DONE">Done</SelectItem>
+                      {statuses.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

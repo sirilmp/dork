@@ -1,8 +1,37 @@
 export type SystemRole = 'ADMIN' | 'MEMBER';
 export type ProjectRole = 'ADMIN' | 'MEMBER' | 'VIEWER';
 export type IssueType = 'EPIC' | 'STORY' | 'TASK' | 'BUG' | 'SUBTASK';
-export type IssueStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
 export type IssuePriority = 'LOWEST' | 'LOW' | 'MEDIUM' | 'HIGH' | 'HIGHEST';
+
+// The one fixed concept behind a project's custom statuses: burndown/
+// "is this done" logic checks category, never a status's name or id.
+export type StatusCategory = 'TODO' | 'IN_PROGRESS' | 'DONE';
+
+export interface WorkflowStatus {
+  id: string;
+  projectId: string;
+  name: string;
+  category: StatusCategory;
+  order: number;
+  color: string | null;
+  isDefault: boolean;
+}
+
+export interface WorkflowTransition {
+  id: string;
+  projectId: string;
+  fromStatusId: string | null;
+  toStatusId: string;
+}
+
+export interface WorkflowResponse {
+  statuses: WorkflowStatus[];
+  transitions: WorkflowTransition[];
+}
+
+// Subset of WorkflowStatus embedded on an Issue (status is included server-side
+// so the client never needs a second round-trip to render name/category/color).
+export type IssueStatusRef = Pick<WorkflowStatus, 'id' | 'name' | 'category' | 'color' | 'order'>;
 
 export interface UserSummary {
   id: string;
@@ -126,7 +155,8 @@ export interface Issue {
   type: IssueType;
   title: string;
   description: string | null;
-  status: IssueStatus;
+  statusId: string;
+  status: IssueStatusRef;
   priority: IssuePriority;
   assigneeId: string | null;
   reporterId: string;
@@ -180,7 +210,7 @@ export interface IssueDetail extends Issue {
 }
 
 export interface BoardColumn {
-  status: IssueStatus;
+  status: WorkflowStatus;
   issues: Issue[];
 }
 

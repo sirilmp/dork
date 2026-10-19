@@ -1,11 +1,11 @@
 import { api } from './client';
-import { BoardColumn, Comment, Issue, IssueDetail, IssuePriority, IssueStatus, IssueType } from './types';
+import { BoardColumn, Comment, Issue, IssueDetail, IssuePriority, IssueType } from './types';
 
 export interface IssueFilters {
   assigneeId?: string;
   labelId?: string;
   type?: IssueType;
-  status?: IssueStatus;
+  statusId?: string;
   search?: string;
 }
 
@@ -23,7 +23,7 @@ export interface IssueInput {
   description?: string;
   type?: IssueType;
   priority?: IssuePriority;
-  status?: IssueStatus;
+  statusId?: string;
   assigneeId?: string | null;
   parentId?: string | null;
   storyPoints?: number | null;
@@ -52,6 +52,6 @@ export const issuesApi = {
   board: (projectId: string) => api.get<{ columns: BoardColumn[] }>(`/projects/${projectId}/board`),
   reorder: (
     projectId: string,
-    input: { issueId: string; toStatus: IssueStatus; orderedIssueIds: string[] }
+    input: { issueId: string; toStatusId: string; orderedIssueIds: string[] }
   ) => api.post<{ ok: boolean }>(`/projects/${projectId}/board/reorder`, input),
 };

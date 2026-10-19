@@ -20,6 +20,7 @@ import { teamsReadRouter } from './modules/teams/teams.routes';
 import { customFieldsRouter } from './modules/custom-fields/custom-fields.routes';
 import { attachmentsRouter, issueAttachmentsRouter } from './modules/attachments/attachments.routes';
 import { crossProjectQueryRouter, filtersRouter, projectQueryRouter } from './modules/filters/filters.routes';
+import { workloadRouter } from './modules/workload/workload.routes';
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use('/api/admin', adminUsersModuleRouter);
 app.use('/api/invites', publicInvitesRouter);
 app.use('/api/me', meRouter);
 app.use('/api/teams', teamsReadRouter);
+app.use('/api/workload', workloadRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

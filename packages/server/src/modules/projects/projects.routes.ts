@@ -156,3 +156,37 @@ projectsRouter.delete(
     res.status(204).send();
   })
 );
+
+const bulkAddTeamSchema = z.object({
+  teamId: z.string().uuid(),
+  role: z.nativeEnum(ProjectRole).default(ProjectRole.MEMBER),
+});
+
+// Convenience bridge between the global Team layer and per-project membership:
+// adds every member of a team as a ProjectMember, skipping existing members.
+projectsRouter.post(
+  '/:projectId/members/bulk-add-team',
+  requireProjectRole(ProjectRole.ADMIN),
+  asyncHandler(async (req, res) => {
+    const input = bulkAddTeamSchema.parse(req.body);
+    const team = await prisma.team.findUnique({
+      where: { id: input.teamId },
+      include: { members: true },
+    });
+    if (!team) throw new HttpError(404, 'Team not found');
+
+    const existing = await prisma.projectMember.findMany({
+      where: { projectId: req.params.projectId },
+      select: { userId: true },
+    });
+    const existingIds = new Set(existing.map((m) => m.userId));
+    const toAdd = team.members.filter((m) => !existingIds.has(m.userId));
+
+    if (toAdd.length > 0) {
+      await prisma.projectMember.createMany({
+        data: toAdd.map((m) => ({ projectId: req.params.projectId, userId: m.userId, role: input.role })),
+      });
+    }
+    res.status(201).json({ added: toAdd.length, skipped: team.members.length - toAdd.length });
+  })
+);

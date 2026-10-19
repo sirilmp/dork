@@ -58,6 +58,8 @@ authRouter.post(
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new HttpError(401, 'Invalid email or password');
 
+    if (user.deactivatedAt) throw new HttpError(403, 'This account has been deactivated');
+
     const token = signAuthToken({ sub: user.id, email: user.email, role: user.role });
     res.json({
       token,

@@ -3,9 +3,22 @@ import { brandingApi, smtpApi } from '../api/admin';
 import { Branding, SmtpSettings } from '../api/types';
 import { useTheme } from '../theme/ThemeProvider';
 import { ApiError } from '../api/client';
+import { UsersTab } from './admin/UsersTab';
+import { InvitesTab } from './admin/InvitesTab';
+import { TeamsTab } from './admin/TeamsTab';
+
+type AdminTab = 'general' | 'users' | 'invites' | 'teams';
+
+const TABS: { id: AdminTab; label: string }[] = [
+  { id: 'general', label: 'Branding & SMTP' },
+  { id: 'users', label: 'Users' },
+  { id: 'invites', label: 'Invites' },
+  { id: 'teams', label: 'Teams' },
+];
 
 export function AdminSettingsPage() {
   const { refresh } = useTheme();
+  const [tab, setTab] = useState<AdminTab>('general');
   const [branding, setBranding] = useState<Branding | null>(null);
   const [smtp, setSmtp] = useState<SmtpSettings | null>(null);
   const [smtpPassword, setSmtpPassword] = useState('');
@@ -67,14 +80,34 @@ export function AdminSettingsPage() {
     }
   }
 
-  if (!branding || !smtp) {
-    return <div className="px-4 py-8 text-slate-500">Loading settings...</div>;
-  }
-
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-semibold text-slate-800">Admin Settings</h1>
 
+      <div className="mb-6 flex gap-1 border-b border-slate-200">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+              tab === t.id ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'users' && <UsersTab />}
+      {tab === 'invites' && <InvitesTab />}
+      {tab === 'teams' && <TeamsTab />}
+
+      {tab === 'general' &&
+        (!branding || !smtp ? (
+          <div className="py-8 text-slate-500">Loading settings...</div>
+        ) : (
+          <>
       <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6">
         <h2 className="mb-4 text-lg font-semibold text-slate-800">Branding</h2>
         <form onSubmit={handleSaveBranding} className="flex flex-col gap-4">
@@ -227,6 +260,8 @@ export function AdminSettingsPage() {
           )}
         </form>
       </section>
+          </>
+        ))}
     </div>
   );
 }

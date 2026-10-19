@@ -13,6 +13,7 @@ import { commentsRouter } from './modules/comments/comments.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { adminRouter } from './modules/admin/admin.routes';
 import { publicBrandingRouter } from './modules/admin/branding.public.routes';
+import { adminUsersModuleRouter, publicInvitesRouter } from './modules/admin-users/admin-users.routes';
 
 const app = express();
 
@@ -35,6 +36,8 @@ app.use('/api/issues', issuesRouter);
 app.use('/api/issues/:issueId/comments', commentsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/admin', adminUsersModuleRouter);
+app.use('/api/invites', publicInvitesRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -17,6 +17,8 @@ export const env = {
   jwtSecret: required('JWT_SECRET', 'dev-only-insecure-secret-change-me'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  // Base URL used to build links (e.g. invite links) sent in emails/API responses.
+  clientUrl: process.env.CLIENT_URL ?? (process.env.CORS_ORIGIN ?? 'http://localhost:5173').split(',')[0].trim(),
   adminEmail: process.env.ADMIN_EMAIL ?? 'admin@example.com',
   adminPassword: process.env.ADMIN_PASSWORD ?? 'ChangeMe123!',
   smtp: {

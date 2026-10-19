@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './auth/LoginPage';
 import { RegisterPage } from './auth/RegisterPage';
+import { AcceptInvitePage } from './auth/AcceptInvitePage';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { useAuth } from './auth/AuthContext';
 import { ProjectsListPage } from './pages/ProjectsListPage';
@@ -30,6 +31,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/invite/:token" element={<AcceptInvitePage />} />
       <Route
         path="/"
         element={

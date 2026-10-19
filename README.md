@@ -52,6 +52,23 @@ configurable branding and SMTP, without touching code.
   `ActivityLog` entries) rather than a pre-aggregated snapshot table — simpler
   at the cost of recomputing the series per request, which is cheap at this
   scale. Issues with no story points count as 0 toward the total.
+- **Global user & team management** (admin-only, `packages/server/src/modules/admin-users/`):
+  org-wide user list with role changes, deactivate/reactivate, and a
+  permanent-delete action; global Teams (simple membership, no per-team
+  role) with a one-click "add all members to this project" bridge into
+  per-project `ProjectMember`; and a self-serve email invite flow
+  (`POST /api/admin/invites` → public `GET/POST /api/invites/:token`) that
+  logs the invited user straight in on acceptance, with a copyable invite
+  link shown in the admin UI when SMTP isn't configured. Two deliberate
+  design choices: (1) deactivating a user (not hard-deleting) is the default
+  removal path, since a hard delete would either be blocked by or
+  cascade-destroy other users' issue/comment/activity history — deactivated
+  users are blocked from login and hidden from assignee pickers, but their
+  past issues/comments keep their name attached; permanent delete is only
+  offered, and only succeeds, for a user with zero historical footprint.
+  (2) the system enforces a single-active-admin invariant: demoting,
+  deactivating, or deleting the last remaining ADMIN is rejected, so a
+  self-hosted instance can never be locked out of its own admin area.
 
 ## Not yet implemented / Roadmap
 

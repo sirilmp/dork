@@ -12,6 +12,51 @@ export interface UserSummary {
   role?: SystemRole;
 }
 
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  role: SystemRole;
+  deactivatedAt: string | null;
+  createdAt: string;
+}
+
+export type InviteStatus = 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+
+export interface Invite {
+  id: string;
+  email: string;
+  role: SystemRole;
+  status: InviteStatus;
+  expiresAt: string;
+  createdAt: string;
+  acceptedAt: string | null;
+  invitedBy: { id: string; name: string; email: string };
+}
+
+export interface InviteCreateResult {
+  invite: Invite;
+  inviteLink: string;
+  emailSent: boolean;
+  emailReason?: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { members: number };
+}
+
+export interface InvitePublicInfo {
+  email: string;
+  role: SystemRole;
+  expiresAt: string;
+}
+
 export interface Project {
   id: string;
   key: string;

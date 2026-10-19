@@ -7,6 +7,8 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
+  /** Used by the accept-invite flow, which already has a token+user from the accept response. */
+  setSession: (token: string, user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -15,6 +17,7 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   login: async () => {},
   register: async () => {},
+  setSession: () => {},
   logout: () => {},
 });
 
@@ -52,8 +55,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  function setSession(token: string, nextUser: AuthUser) {
+    persistToken(token);
+    setUser(nextUser);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, register, setSession, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

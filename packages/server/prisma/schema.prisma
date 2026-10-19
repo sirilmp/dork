@@ -60,6 +60,13 @@ enum NotificationType {
   ISSUE_STATUS_CHANGED
 }
 
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -67,6 +74,11 @@ model User {
   name         String
   avatarUrl    String?
   role         SystemRole @default(MEMBER)
+  // Null means active. A deactivated user is blocked from logging in and is
+  // hidden from assignee-picker dropdowns going forward, but their historical
+  // issues/comments/activity are left intact with their name still shown —
+  // see the admin-users module for why this is deliberately not a hard delete.
+  deactivatedAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -77,8 +89,54 @@ model User {
   comments          Comment[]
   activityLogs      ActivityLog[]
   notifications     Notification[]
+  teamMemberships   TeamMember[]
+  sentInvites       Invite[]        @relation("InvitedBy")
 
   @@index([email])
+}
+
+model Invite {
+  id            String       @id @default(uuid())
+  email         String
+  // Stored as a raw opaque random token rather than hashed: an invite token is
+  // a short-lived (7 day), single-purpose, revocable capability — not a
+  // reusable credential like a password — and the public lookup endpoint
+  // needs to resolve it directly. See admin-users module notes for the
+  // full tradeoff vs. hashing like bcrypt does for passwords.
+  token         String       @unique
+  invitedById   String
+  invitedBy     User         @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  role          SystemRole   @default(MEMBER)
+  status        InviteStatus @default(PENDING)
+  expiresAt     DateTime
+  createdAt     DateTime     @default(now())
+  acceptedAt    DateTime?
+
+  @@index([email])
+  @@index([status])
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members TeamMember[]
+}
+
+model TeamMember {
+  teamId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@unique([teamId, userId])
+  @@index([userId])
 }
 
 model Project {

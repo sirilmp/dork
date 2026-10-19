@@ -11,15 +11,20 @@ usersRouter.get(
   '/',
   asyncHandler(async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    // Deactivated users are hidden from assignee-picker style lookups going
+    // forward, but their historical issues/comments/activity are untouched.
     const users = await prisma.user.findMany({
-      where: search
-        ? {
-            OR: [
-              { name: { contains: search, mode: 'insensitive' } },
-              { email: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
+      where: {
+        deactivatedAt: null,
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
       select: { id: true, name: true, email: true, avatarUrl: true, role: true },
       orderBy: { name: 'asc' },
       take: 50,

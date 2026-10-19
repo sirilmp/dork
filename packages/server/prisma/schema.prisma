@@ -71,6 +71,14 @@ enum InviteStatus {
   EXPIRED
 }
 
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  CHECKBOX
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -96,6 +104,7 @@ model User {
   teamMemberships   TeamMember[]
   sentInvites       Invite[]        @relation("InvitedBy")
   starredProjects   StarredProject[]
+  attachments       Attachment[]
 
   @@index([email])
 }
@@ -164,8 +173,50 @@ model Project {
   starredBy StarredProject[]
   workflowStatuses    WorkflowStatus[]
   workflowTransitions WorkflowTransition[]
+  customFieldDefinitions CustomFieldDefinition[]
 
   @@index([leadId])
+}
+
+// Project-admin-defined custom field on this project's issues. `options` is
+// only meaningful for SELECT (a JSON array of string choices); other types
+// ignore it.
+model CustomFieldDefinition {
+  id        String          @id @default(uuid())
+  projectId String
+  name      String
+  fieldType CustomFieldType
+  options   Json?
+  required  Boolean         @default(false)
+  order     Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  project Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  values  CustomFieldValue[]
+
+  @@index([projectId, order])
+}
+
+// One issue's value for one custom field definition. `value`'s JSON shape
+// depends on the definition's fieldType: string for TEXT/SELECT, number for
+// NUMBER, ISO date string for DATE, boolean for CHECKBOX. A missing row means
+// "unset" rather than storing an explicit null, so the client always derives
+// the full set of fields (including unset ones) from the project's
+// definitions joined with whatever value rows exist for the issue.
+model CustomFieldValue {
+  id               String   @id @default(uuid())
+  issueId          String
+  fieldDefinitionId String
+  value            Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  issue           Issue                 @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  fieldDefinition CustomFieldDefinition @relation(fields: [fieldDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([issueId, fieldDefinitionId])
+  @@index([fieldDefinitionId])
 }
 
 // A project's configurable workflow: the ordered set of statuses its issues
@@ -267,7 +318,14 @@ model Issue {
   number      Int
   type        IssueType     @default(TASK)
   title       String
+  // Plain-text fallback kept in sync (derived server-side from descriptionJson
+  // on every save) for search/preview use — see descriptionJson for the
+  // source of truth.
   description String?
+  // Tiptap document JSON (source of truth for rendering). Stored as JSON
+  // rather than HTML/markdown so the client fully controls the renderer and
+  // no server-side HTML sanitization is needed to avoid stored XSS.
+  descriptionJson Json?
   statusId    String
   priority    IssuePriority @default(MEDIUM)
 
@@ -307,6 +365,8 @@ model Issue {
   activityLogs  ActivityLog[]
   linksFrom     IssueLink[]   @relation("LinksFrom")
   linksTo       IssueLink[]   @relation("LinksTo")
+  customFieldValues CustomFieldValue[]
+  attachments   Attachment[]
 
   @@unique([projectId, number])
   @@index([projectId, statusId])
@@ -360,6 +420,26 @@ model Comment {
 
   issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
   author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+}
+
+// A file uploaded to an issue. The actual bytes live on local disk (see the
+// attachments module), named by a generated UUID — never the original
+// filename — to avoid path-traversal and collision issues; this row is the
+// only place the original name/mime/size are recorded.
+model Attachment {
+  id           String   @id @default(uuid())
+  issueId      String
+  uploadedById String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String
+  createdAt    DateTime @default(now())
+
+  issue      Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  uploadedBy User  @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([issueId])
 }

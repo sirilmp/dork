@@ -11,3 +11,4 @@ packages/server/dist/
 .vscode/
 coverage/
 *.tsbuildinfo
+packages/server/uploads/

@@ -30,6 +30,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     ports:
       - '${PORT:-4000}:4000'
+    volumes:
+      - attachments_data:/app/packages/server/uploads
 
   client:
     build:
@@ -45,3 +47,4 @@ services:
 
 volumes:
   postgres_data:
+  attachments_data:

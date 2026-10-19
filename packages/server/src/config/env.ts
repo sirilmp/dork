@@ -21,6 +21,10 @@ export const env = {
   clientUrl: process.env.CLIENT_URL ?? (process.env.CORS_ORIGIN ?? 'http://localhost:5173').split(',')[0].trim(),
   adminEmail: process.env.ADMIN_EMAIL ?? 'admin@example.com',
   adminPassword: process.env.ADMIN_PASSWORD ?? 'ChangeMe123!',
+  // Local-disk attachment storage. Fine for a single-container self-host;
+  // multiple server replicas would need shared/networked storage instead.
+  uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
+  maxAttachmentMb: Number(process.env.MAX_ATTACHMENT_MB ?? 25),
   smtp: {
     host: process.env.SMTP_HOST ?? '',
     port: Number(process.env.SMTP_PORT ?? 587),

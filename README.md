@@ -31,6 +31,15 @@ configurable branding and SMTP, without touching code.
   custom branding before sign-in); `PUT /api/admin/branding` is admin-only.
   The client's `ThemeProvider` applies colors as CSS custom properties, and
   sets `document.title` and the favicon.
+- **UI**: built on [shadcn/ui](https://ui.shadcn.com) (Radix UI primitives +
+  Tailwind CSS) — every interactive element (buttons, forms, selects,
+  dialogs, tables, tabs, toasts, the issue due-date picker, the searchable
+  assignee/member pickers) is a shadcn component under
+  `packages/client/src/components/ui`. Admin-configured branding colors
+  propagate to shadcn's theme tokens automatically: `ThemeProvider` converts
+  the admin's primary/accent hex colors to HSL and sets them as shadcn's
+  `--primary`/`--accent`/`--ring` CSS variables at runtime, so changing
+  branding re-themes shadcn components too, with no redeploy needed.
 - **SMTP settings**: configurable via bootstrap environment variables AND an
   in-app Admin Settings screen backed by the database. **Database settings
   override environment defaults** — env vars are the first-boot fallback.

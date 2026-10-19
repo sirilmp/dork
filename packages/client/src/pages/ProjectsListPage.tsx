@@ -11,6 +11,7 @@ import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { StarButton } from '../components/StarButton';
 
 export function ProjectsListPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -99,7 +100,10 @@ export function ProjectsListPage() {
               <Card className="h-full p-4 transition-colors hover:border-primary">
                 <div className="mb-2 flex items-center justify-between">
                   <Badge variant="secondary">{project.key}</Badge>
-                  <span className="text-xs text-muted-foreground">{project._count?.issues ?? 0} issues</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">{project._count?.issues ?? 0} issues</span>
+                    <StarButton project={project} />
+                  </div>
                 </div>
                 <h2 className="font-semibold text-foreground">{project.name}</h2>
                 {project.description && (

@@ -12,6 +12,8 @@ import { IssueCard } from '../components/IssueCard';
 import { IssueDetailModal } from './IssueDetailModal';
 import { CreateIssueForm } from '../components/CreateIssueForm';
 import { Button } from '../components/ui/button';
+import { StarButton } from '../components/StarButton';
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 const STATUSES: IssueStatus[] = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
@@ -26,6 +28,7 @@ export function ProjectBoardPage() {
   const [loading, setLoading] = useState(true);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const { recordView } = useRecentlyViewed();
 
   async function load() {
     if (!projectId) return;
@@ -37,6 +40,7 @@ export function ProjectBoardPage() {
     setProject(projectResult);
     setColumns(boardResult.columns);
     setLoading(false);
+    recordView({ kind: 'project', id: projectResult.id, label: projectResult.name, meta: projectResult.key, href: `/projects/${projectResult.id}/board` });
   }
 
   useEffect(() => {
@@ -136,8 +140,9 @@ export function ProjectBoardPage() {
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">
+          <h1 className="flex items-center gap-1 text-xl font-semibold text-foreground">
             {project.name} <span className="text-muted-foreground">({project.key})</span>
+            <StarButton project={project} />
           </h1>
           <div className="mt-1 flex gap-3 text-sm">
             <span className="font-medium text-primary">Board</span>

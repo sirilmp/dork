@@ -11,6 +11,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { DatePicker } from '../components/ui/date-picker';
 import { cn } from '../lib/utils';
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 const UNASSIGNED = '__unassigned__';
 
@@ -37,6 +38,7 @@ export function IssueDetailModal({
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [editingDescription, setEditingDescription] = useState(false);
   const [commentBody, setCommentBody] = useState('');
+  const { recordView } = useRecentlyViewed();
 
   async function load() {
     setLoading(true);
@@ -44,6 +46,16 @@ export function IssueDetailModal({
     setIssue(result);
     setDescriptionDraft(result.description ?? '');
     setLoading(false);
+    // No deep-link route exists for a single issue yet, so "recent issue"
+    // entries land back on its project's board, where the issue can be
+    // reopened from the column it's in.
+    recordView({
+      kind: 'issue',
+      id: result.id,
+      label: result.key,
+      meta: result.project.key,
+      href: `/projects/${result.projectId}/board`,
+    });
   }
 
   useEffect(() => {

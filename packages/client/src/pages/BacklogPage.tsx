@@ -29,6 +29,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
+import { StarButton } from '../components/StarButton';
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 const BACKLOG_ID = 'backlog';
 const BACKLOG_OPTION = '__backlog__';
@@ -341,6 +343,7 @@ export function BacklogPage() {
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const { recordView } = useRecentlyViewed();
 
   async function load() {
     if (!projectId) return;
@@ -352,6 +355,7 @@ export function BacklogPage() {
     setProject(projectResult);
     setData(backlogResult);
     setLoading(false);
+    recordView({ kind: 'project', id: projectResult.id, label: projectResult.name, meta: projectResult.key, href: `/projects/${projectResult.id}/board` });
   }
 
   useEffect(() => {
@@ -453,8 +457,9 @@ export function BacklogPage() {
     <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">
+          <h1 className="flex items-center gap-1 text-xl font-semibold text-foreground">
             {project.name} <span className="text-muted-foreground">({project.key})</span>
+            <StarButton project={project} />
           </h1>
           <div className="mt-1 flex gap-3 text-sm">
             <Link to={`/projects/${project.id}/board`} className="text-muted-foreground hover:text-primary">

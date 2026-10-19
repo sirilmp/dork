@@ -1,25 +1,17 @@
-import { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
-import { Navbar } from './components/Navbar';
+import { Layout } from './components/layout/Layout';
 import { LoginPage } from './auth/LoginPage';
 import { RegisterPage } from './auth/RegisterPage';
 import { AcceptInvitePage } from './auth/AcceptInvitePage';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { useAuth } from './auth/AuthContext';
+import { HomePage } from './pages/HomePage';
 import { ProjectsListPage } from './pages/ProjectsListPage';
 import { ProjectBoardPage } from './pages/ProjectBoardPage';
 import { BacklogPage } from './pages/BacklogPage';
+import { TeamsPage } from './pages/TeamsPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
-
-function AppShell({ children }: { children: ReactNode }) {
-  return (
-    <div className="min-h-screen bg-muted/30">
-      <Navbar />
-      {children}
-    </div>
-  );
-}
 
 export default function App() {
   const { loading } = useAuth();
@@ -44,9 +36,19 @@ export default function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <AppShell>
+            <Layout>
+              <HomePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects"
+        element={
+          <ProtectedRoute>
+            <Layout>
               <ProjectsListPage />
-            </AppShell>
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -54,9 +56,9 @@ export default function App() {
         path="/projects/:projectId/board"
         element={
           <ProtectedRoute>
-            <AppShell>
+            <Layout>
               <ProjectBoardPage />
-            </AppShell>
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -64,9 +66,19 @@ export default function App() {
         path="/projects/:projectId/backlog"
         element={
           <ProtectedRoute>
-            <AppShell>
+            <Layout>
               <BacklogPage />
-            </AppShell>
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/teams"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TeamsPage />
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -74,9 +86,9 @@ export default function App() {
         path="/admin/settings"
         element={
           <ProtectedRoute adminOnly>
-            <AppShell>
+            <Layout>
               <AdminSettingsPage />
-            </AppShell>
+            </Layout>
           </ProtectedRoute>
         }
       />

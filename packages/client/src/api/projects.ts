@@ -18,4 +18,6 @@ export const projectsApi = {
     api.post<Label>(`/projects/${projectId}/labels`, input),
   deleteLabel: (projectId: string, labelId: string) =>
     api.delete<void>(`/projects/${projectId}/labels/${labelId}`),
+  star: (projectId: string) => api.post<{ starred: boolean }>(`/projects/${projectId}/star`),
+  unstar: (projectId: string) => api.delete<void>(`/projects/${projectId}/star`),
 };

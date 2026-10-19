@@ -32,6 +32,7 @@ export interface IssueInput {
 }
 
 export const issuesApi = {
+  mine: () => api.get<Issue[]>('/issues/mine'),
   listForProject: (projectId: string, filters?: IssueFilters) =>
     api.get<Issue[]>(`/projects/${projectId}/issues${toQuery(filters)}`),
   create: (projectId: string, input: IssueInput) =>
